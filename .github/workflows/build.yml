@@ -73,6 +73,8 @@ jobs:
       - run: cargo test -p soap -p soap-app
       - name: Package
         run: |
+          # The Rust cache restores target/: drop packages from earlier runs.
+          rm -rf target/dist
           VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-unix.sh
           VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-app-unix.sh
       - name: Smoke test with the real model
@@ -106,6 +108,8 @@ jobs:
       - run: cargo clippy -p soap-app --all-targets -- -D warnings
       - name: Package
         run: |
+          # The Rust cache restores target/: drop packages from earlier runs.
+          rm -rf target/dist
           VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-unix.sh
           VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-app-unix.sh
       - name: Smoke test with the real model
@@ -183,6 +187,8 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
+          # The Rust cache restores target/: drop packages from earlier runs.
+          Remove-Item -Recurse -Force target/dist -ErrorAction SilentlyContinue
           ./scripts/package-windows.ps1 -Version ($env:GITHUB_REF_NAME -replace '/', '-') -ClearDir clear-windows-x64
           ./scripts/package-app-windows.ps1 -Version ($env:GITHUB_REF_NAME -replace '/', '-') -ClearDir clear-windows-x64
       - name: Probe the Clear DLLs

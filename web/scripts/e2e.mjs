@@ -27,8 +27,12 @@ try {
     null,
     { timeout: 180_000 },
   );
-  const status = await page.textContent("#model-status-text");
-  if (!/pront/i.test(status)) throw new Error(`model did not load: ${status} / ${await page.textContent("#error")}`);
+  // The state, not the text: the UI follows the browser language (EN or IT).
+  const state = await page.getAttribute("#model-status", "data-state");
+  if (state !== "ready") {
+    const status = await page.textContent("#model-status-text");
+    throw new Error(`model did not load: ${status} / ${await page.textContent("#error")}`);
+  }
 
   await page.click("#process");
   await page.waitForSelector("#download:not([hidden])", { timeout: 180_000 });
