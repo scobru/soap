@@ -105,6 +105,8 @@ examples fail too.
 
 ## Web interface (`web/`)
 
+**Live demo:** [soap-blond.vercel.app](https://soap-blond.vercel.app)
+
 ```bash
 cd web
 npm install
