@@ -1,4 +1,13 @@
-# Remove That Dirt (RTD)
+<p align="center"><img src="assets/logo.svg" width="128" alt="Soap logo"></p>
+
+<h1 align="center">Soap</h1>
+
+<p align="center"><b>Voice cleaner</b>: denoise, dereverb and loudness, entirely on your device.</p>
+
+<p align="center">
+  <img src="assets/screenshot-plugin.png" width="360" alt="The Soap plugin">
+  <img src="assets/screenshot-web.png" width="480" alt="The Soap web app">
+</p>
 
 Voice cleanup (denoise, dereverb, loudness normalization) built on
 [Clear](https://desertant.com/models/clear/) from Desert Ant Labs, a fine-tuned
@@ -24,9 +33,9 @@ also leaves them as Actions artifacts):
 
 | Package | Contents | Install |
 |---|---|---|
-| `remove-that-dirt-…-windows.zip` | VST3, CLAP | `install.cmd` → `C:\Program Files\Common Files\{VST3,CLAP}` (`install.ps1 -User` for the current user only) |
-| `remove-that-dirt-…-macos.zip` | AU, VST3, CLAP | `./install.sh` → `~/Library/Audio/Plug-Ins/{Components,VST3,CLAP}` |
-| `remove-that-dirt-…-linux.zip` | VST3, CLAP | `./install.sh` → `~/.vst3`, `~/.clap` |
+| `soap-…-windows.zip` | VST3, CLAP | `install.cmd` → `C:\Program Files\Common Files\{VST3,CLAP}` (`install.ps1 -User` for the current user only) |
+| `soap-…-macos.zip` | AU, VST3, CLAP | `./install.sh` → `~/Library/Audio/Plug-Ins/{Components,VST3,CLAP}` |
+| `soap-…-linux.zip` | VST3, CLAP | `./install.sh` → `~/.vst3`, `~/.clap` |
 
 Each package already contains the Clear native core. The model weights are
 downloaded from Hugging Face the first time you press Clean and then stay
@@ -39,7 +48,7 @@ cached.
 
 ### Usage
 
-1. Put Remove That Dirt on the voice track.
+1. Put Soap on the voice track.
 2. Press **Capture**, then play the section you want to clean in your DAW.
 3. When the transport stops, the take is cleaned in the background (turn off *Clean when capture stops* to do it by hand).
 4. Play the project: over the captured region the plugin replaces the input with the clean version. **A · Original / B · Clean** switches between them instantly.
@@ -48,13 +57,13 @@ cached.
 Details:
 
 - Capture follows the timeline position, so it handles loops, jumps, and several passes over the same region.
-- The project saves only a reference to the take. The audio (original and clean, 32-bit float WAV) lives in the `remove-that-dirt/takes` folder under your user data directory. **Open folder** takes you there, so you can also drag the clean file straight into the DAW.
+- The project saves only a reference to the take. The audio (original and clean, 32-bit float WAV) lives in the `soap-voice/takes` folder under your user data directory. **Open folder** takes you there, so you can also drag the clean file straight into the DAW.
 - If the project's sample rate changes, the take is re-rendered automatically from the original.
 - The audio thread never allocates or blocks. Capture goes through lock-free ring buffers, and download, inference, and disk I/O run on a worker thread.
 
 ### How it's built
 
-- `plugin/src`: the plugin in Rust with [nih-plug](https://github.com/robbert-vdh/nih-plug) (CLAP export) and an egui GUI. Clear is loaded at runtime through its C ABI (`dal_*`), the same one the official Node SDK uses.
+- `plugin/src`: the plugin in Rust with [nih-plug](https://github.com/robbert-vdh/nih-plug) (CLAP export) and a custom egui GUI (`theme.rs`: palette, logo painted as vectors, bubble sliders, foam animation while cleaning). Clear is loaded at runtime through its C ABI (`dal_*`), the same one the official Node SDK uses.
 - `plugin/wrapper`: [clap-wrapper](https://github.com/free-audio/clap-wrapper) turns the CLAP into **VST3** and **AUv2**. On macOS the CLAP is embedded in the VST3 and AU bundles, and the Clear core in `Contents/Resources/native` of the CLAP.
 - Clear core:
   - macOS and Linux: prebuilt from the `@desert-ant-labs/clear` npm package (`scripts/install-native.sh`).
@@ -78,7 +87,7 @@ cd plugin
 ```
 
 To try the model outside a DAW:
-`RTD_NATIVE_DIR=<clear-core-folder> cargo run --release --example enhance_wav -- noisy.wav clean.wav`.
+`SOAP_NATIVE_DIR=<clear-core-folder> cargo run --release --example enhance_wav -- noisy.wav clean.wav`.
 
 ### Tests and CI
 
@@ -122,4 +131,6 @@ the host must send `Cross-Origin-Opener-Policy: same-origin` and
   - You may not use the model or its outputs to train competing models.
   - The SDK sends Desert Ant Labs an active-device count. It never sends the audio.
 - **nih-plug** is ISC and **clap-wrapper** is MIT. The **VST3 SDK** (MIT since 2025) and **AudioUnitSDK** (Apache 2.0) are fetched at build time. There are no GPL components: VST3 comes from clap-wrapper, not from nih-plug's GPLv3 export.
+- The **Nunito** font (plugin and web app) is under the SIL Open Font License 1.1 (`plugin/assets/fonts/OFL.txt`).
+- The logo and icons (`assets/`, `web/public/`) are part of this project.
 - VST is a trademark of Steinberg Media Technologies GmbH.

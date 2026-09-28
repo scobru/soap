@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Install Remove That Dirt for the current user (CLAP, VST3 and AU).
+# Install Soap for the current user (CLAP, VST3 and AU).
 set -euo pipefail
 cd "$(dirname "$0")"
-NAME="Remove That Dirt"
+NAME="Soap"
 base="$HOME/Library/Audio/Plug-Ins"
 mkdir -p "$base/CLAP" "$base/VST3" "$base/Components"
 rm -rf "$base/CLAP/$NAME.clap" "$base/VST3/$NAME.vst3" "$base/Components/$NAME.component"

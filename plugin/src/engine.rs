@@ -45,14 +45,14 @@ pub fn platform_key() -> &'static str {
 }
 
 pub fn default_native_dir() -> Option<PathBuf> {
-    dirs::data_local_dir().map(|d| d.join("remove-that-dirt").join("native").join(platform_key()))
+    dirs::data_local_dir().map(|d| d.join("soap-voice").join("native").join(platform_key()))
 }
 
 /// Release builds ship the Clear core next to the plugin binary: in the
 /// bundle's `Resources/native` on macOS, beside the `.clap` elsewhere.
 fn native_dir_candidates() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
-    if let Some(dir) = std::env::var_os("RTD_NATIVE_DIR") {
+    if let Some(dir) = std::env::var_os("SOAP_NATIVE_DIR") {
         dirs.push(PathBuf::from(dir));
     }
     if let Some(dir) = own_module_path().as_deref().and_then(Path::parent) {

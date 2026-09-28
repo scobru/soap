@@ -4,7 +4,7 @@
 set -euo pipefail
 
 VERSION="${VERSION:-dev}"
-NAME="Remove That Dirt"
+NAME="Soap"
 
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) os=macos key=darwin-arm64 ;;
@@ -13,15 +13,15 @@ case "$(uname -s)-$(uname -m)" in
   *) echo "Unsupported build host: $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
 
-cargo xtask bundle remove_that_dirt --release
+cargo xtask bundle soap --release
 clap="$PWD/target/bundled/$NAME.clap"
 
 native="$PWD/target/native/$key"
 if [ ! -e "$native/LICENSE.md" ]; then
-  RTD_NATIVE_DIR="$native" ./scripts/install-native.sh
+  SOAP_NATIVE_DIR="$native" ./scripts/install-native.sh
 fi
 
-out="$PWD/target/dist/remove-that-dirt-$VERSION-$os"
+out="$PWD/target/dist/soap-$VERSION-$os"
 rm -rf "$out" && mkdir -p "$out"
 
 find_bundle() { find target/wrapper -maxdepth 3 -name "$1" -print -quit; }
@@ -33,7 +33,7 @@ if [ "$os" = macos ]; then
   codesign --force --sign - "$clap/Contents/Resources/native/libClearNode.dylib"
   codesign --force --sign - "$clap"
 
-  cmake -S wrapper -B target/wrapper -DCMAKE_BUILD_TYPE=Release -DRTD_CLAP_BUNDLE="$clap"
+  cmake -S wrapper -B target/wrapper -DCMAKE_BUILD_TYPE=Release -DSOAP_CLAP_BUNDLE="$clap"
   cmake --build target/wrapper --config Release -j 4
 
   cp -R "$clap" "$out/"

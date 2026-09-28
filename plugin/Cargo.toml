@@ -1,5 +1,5 @@
 [package]
-name = "remove_that_dirt"
+name = "soap"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.88"
@@ -13,7 +13,7 @@ members = ["xtask"]
 crate-type = ["cdylib", "lib"]
 
 [[bin]]
-name = "remove_that_dirt"
+name = "soap"
 path = "src/main.rs"
 required-features = ["standalone"]
 

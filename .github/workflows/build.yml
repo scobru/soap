@@ -75,7 +75,7 @@ jobs:
       - name: Smoke test with the real model
         run: |
           python3 scripts/make-test-wav.py noisy.wav
-          RTD_NATIVE_DIR=target/native/linux-x64 cargo run --release --example enhance_wav -- noisy.wav clean.wav
+          SOAP_NATIVE_DIR=target/native/linux-x64 cargo run --release --example enhance_wav -- noisy.wav clean.wav
       - uses: actions/upload-artifact@v5
         with:
           name: plugin-linux
@@ -99,15 +99,15 @@ jobs:
       - name: Smoke test with the real model
         run: |
           python3 scripts/make-test-wav.py noisy.wav
-          RTD_NATIVE_DIR=target/native/darwin-arm64 cargo run --release --example enhance_wav -- noisy.wav clean.wav
+          SOAP_NATIVE_DIR=target/native/darwin-arm64 cargo run --release --example enhance_wav -- noisy.wav clean.wav
       - name: Validate the Audio Unit
         run: |
-          pkg=$(find target/dist -maxdepth 1 -type d -name 'remove-that-dirt-*-macos' | head -1)
+          pkg=$(find target/dist -maxdepth 1 -type d -name 'soap-*-macos' | head -1)
           mkdir -p ~/Library/Audio/Plug-Ins/Components
-          cp -R "$pkg/Remove That Dirt.component" ~/Library/Audio/Plug-Ins/Components/
+          cp -R "$pkg/Soap.component" ~/Library/Audio/Plug-Ins/Components/
           killall -9 AudioComponentRegistrar || true
-          auval -a | grep -i "Rtdt" || true
-          auval -v aufx Rtdt Scbr
+          auval -a | grep -i "Soap" || true
+          auval -v aufx Soap Scbr
       - uses: actions/upload-artifact@v5
         with:
           name: plugin-macos
@@ -167,7 +167,7 @@ jobs:
         shell: pwsh
         run: |
           python scripts/make-test-wav.py noisy.wav
-          $env:RTD_NATIVE_DIR = (Resolve-Path clear-windows-x64).Path
+          $env:SOAP_NATIVE_DIR = (Resolve-Path clear-windows-x64).Path
           cargo run --release --example enhance_wav -- noisy.wav clean.wav
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v5

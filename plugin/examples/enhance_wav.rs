@@ -1,7 +1,7 @@
 //! Run Clear on a WAV file outside a DAW, to check the native install:
 //! `cargo run --release --example enhance_wav -- in.wav out.wav`
 
-use remove_that_dirt::engine::{ClearModel, EnhanceOptions};
+use soap::engine::{ClearModel, EnhanceOptions};
 
 fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
