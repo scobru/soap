@@ -163,7 +163,7 @@ struct ClearLib {
     destroy: PtrFn,
     buffer_free: PtrFn,
     dir: PathBuf,
-    // Held for the lifetime of the process: the Swift core must never be unloaded.
+    // Held for the lifetime of the process (in a static): the Swift core must never be unloaded.
     _core: Library,
 }
 
@@ -191,7 +191,9 @@ impl ClearLib {
         let err = |e: libloading::Error| format!("Could not load the Clear library: {e}");
         // On Linux the core finds libLiteRt.so beside it through its $ORIGIN runpath.
         trace(|| format!("loading {}", dir.join(CORE_FILE).display()));
-        let core = load_library(&dir.join(CORE_FILE)).map_err(err)?;
+        // Never unloaded, not even on the error paths below: FreeLibrary on the
+        // Swift runtime deadlocks on Windows.
+        let core = std::mem::ManuallyDrop::new(load_library(&dir.join(CORE_FILE)).map_err(err)?);
         trace(|| "resolving symbols".into());
 
         if cfg!(target_os = "linux") {
@@ -222,7 +224,7 @@ impl ClearLib {
             destroy: std::mem::transmute::<unsafe extern "C" fn(), PtrFn>(destroy),
             buffer_free: std::mem::transmute::<unsafe extern "C" fn(), PtrFn>(buffer_free),
             dir: dir.to_path_buf(),
-            _core: core,
+            _core: std::mem::ManuallyDrop::into_inner(core),
         })
     }
 }
