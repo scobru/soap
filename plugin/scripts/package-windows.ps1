@@ -5,9 +5,9 @@ param(
     [string]$ClearDir = "clear-windows-x64"
 )
 $ErrorActionPreference = "Stop"
-$name = "Remove That Dirt"
+$name = "Soap"
 
-cargo xtask bundle remove_that_dirt --release
+cargo xtask bundle soap --release
 if ($LASTEXITCODE -ne 0) { throw "cargo xtask bundle failed" }
 
 cmake -S wrapper -B target/wrapper
@@ -17,7 +17,7 @@ if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
 $vst3 = Get-ChildItem target/wrapper -Recurse -Filter "$name.vst3" | Select-Object -First 1
 if (-not $vst3) { throw "VST3 not found" }
 
-$out = "target/dist/remove-that-dirt-$Version-windows"
+$out = "target/dist/soap-$Version-windows"
 Remove-Item -Recurse -Force $out -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path "$out/CLAP/$name", "$out/VST3" | Out-Null
 

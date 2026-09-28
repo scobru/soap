@@ -9,14 +9,21 @@ if(APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Clear needs macOS 14")
 endif()
 
-project(remove_that_dirt_wrappers VERSION 0.1.0 LANGUAGES C CXX)
+project(soap_wrappers VERSION 0.1.0 LANGUAGES C CXX)
 if(APPLE)
     enable_language(OBJC OBJCXX)
 endif()
 
+# clap-wrapper sets C++17 only when it is the top-level project; Apple clang
+# would otherwise compile the SDKs as C++98.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(RTD_NAME "Remove That Dirt")
-set(RTD_CLAP_BUNDLE "" CACHE PATH "Path to the built '${RTD_NAME}.clap' (embedded on macOS)")
+# clap-wrapper links its own targets against the static MSVC runtime unless
+# told otherwise; the wrapper targets defined here must match it.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set(SOAP_NAME "Soap")
+set(SOAP_CLAP_BUNDLE "" CACHE PATH "Path to the built '${SOAP_NAME}.clap' (embedded on macOS)")
 
 set(CLAP_WRAPPER_DOWNLOAD_DEPENDENCIES TRUE CACHE BOOL "Fetch the CLAP, VST3 and AudioUnit SDKs" FORCE)
 include(FetchContent)
@@ -27,30 +34,30 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(clap-wrapper)
 
-if(APPLE AND RTD_CLAP_BUNDLE STREQUAL "")
-    message(FATAL_ERROR "Set -DRTD_CLAP_BUNDLE=/path/to/${RTD_NAME}.clap")
+if(APPLE AND SOAP_CLAP_BUNDLE STREQUAL "")
+    message(FATAL_ERROR "Set -DSOAP_CLAP_BUNDLE=/path/to/${SOAP_NAME}.clap")
 endif()
 
-add_library(rtd_vst3 MODULE)
+add_library(soap_vst3 MODULE)
 target_add_vst3_wrapper(
-    TARGET rtd_vst3
-    OUTPUT_NAME "${RTD_NAME}"
-    BUNDLE_IDENTIFIER "com.scobru.remove-that-dirt.vst3"
+    TARGET soap_vst3
+    OUTPUT_NAME "${SOAP_NAME}"
+    BUNDLE_IDENTIFIER "com.scobru.soap.vst3"
     BUNDLE_VERSION "${PROJECT_VERSION}"
-    MACOS_EMBEDDED_CLAP_LOCATION "${RTD_CLAP_BUNDLE}"
+    MACOS_EMBEDDED_CLAP_LOCATION "${SOAP_CLAP_BUNDLE}"
 )
 
 if(APPLE)
-    add_library(rtd_auv2 MODULE)
+    add_library(soap_auv2 MODULE)
     target_add_auv2_wrapper(
-        TARGET rtd_auv2
-        OUTPUT_NAME "${RTD_NAME}"
-        BUNDLE_IDENTIFIER "com.scobru.remove-that-dirt.component"
+        TARGET soap_auv2
+        OUTPUT_NAME "${SOAP_NAME}"
+        BUNDLE_IDENTIFIER "com.scobru.soap.component"
         BUNDLE_VERSION "${PROJECT_VERSION}"
         INSTRUMENT_TYPE "aufx"
         MANUFACTURER_NAME "scobru"
         MANUFACTURER_CODE "Scbr"
-        SUBTYPE_CODE "Rtdt"
-        MACOS_EMBEDDED_CLAP_LOCATION "${RTD_CLAP_BUNDLE}"
+        SUBTYPE_CODE "Soap"
+        MACOS_EMBEDDED_CLAP_LOCATION "${SOAP_CLAP_BUNDLE}"
     )
 endif()

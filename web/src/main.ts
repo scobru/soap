@@ -1,3 +1,5 @@
+import "@fontsource/nunito/600.css";
+import "@fontsource/nunito/800.css";
 import type { Clear as ClearInstance, ClearResult, EnhanceOptions, LoudnessPreset } from "@desert-ant-labs/clear";
 import { encodeWav, type WavFormat } from "./wav";
 import { Waveform } from "./waveform";
@@ -198,6 +200,7 @@ ui.record.addEventListener("click", async () => {
 
 ui.strength.addEventListener("input", () => {
   ui.strengthOut.textContent = `${ui.strength.value}%`;
+  ui.strength.style.setProperty("--fill", `${ui.strength.value}%`);
 });
 ui.loudness.addEventListener("change", () => {
   const mastering = ui.loudness.value !== "off";
@@ -237,10 +240,11 @@ ui.process.addEventListener("click", async () => {
   refreshButtons();
   showError(null);
   player.pause();
+  document.body.classList.add("foaming");
   try {
     const model = await getModel();
     setProgress(null);
-    ui.process.textContent = "Elaborazione…";
+    ui.process.textContent = "Insapono…";
     // Let the button repaint before the wasm core takes the main thread.
     await new Promise((r) => setTimeout(r, 30));
     const input = source.channels.length > 1 ? source.channels : source.channels[0];
@@ -250,6 +254,7 @@ ui.process.addEventListener("click", async () => {
     showError(err);
   } finally {
     busy = false;
+    document.body.classList.remove("foaming");
     ui.process.textContent = "Pulisci la voce";
     ui.progress.hidden = true;
     refreshButtons();

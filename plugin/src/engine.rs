@@ -45,23 +45,52 @@ pub fn platform_key() -> &'static str {
 }
 
 pub fn default_native_dir() -> Option<PathBuf> {
-    dirs::data_local_dir().map(|d| d.join("remove-that-dirt").join("native").join(platform_key()))
+    dirs::data_local_dir().map(|d| d.join("soap-voice").join("native").join(platform_key()))
 }
 
-/// Release builds ship the Clear core next to the plugin binary: in the
-/// bundle's `Resources/native` on macOS, beside the `.clap` elsewhere.
-fn native_dir_candidates() -> Vec<PathBuf> {
-    let mut dirs = Vec::new();
-    if let Some(dir) = std::env::var_os("RTD_NATIVE_DIR") {
-        dirs.push(PathBuf::from(dir));
+/// Print a loading step when `SOAP_DEBUG_LOAD` is set (diagnostics only).
+fn trace(message: impl FnOnce() -> String) {
+    if std::env::var_os("SOAP_DEBUG_LOAD").is_some() {
+        eprintln!("[soap] {}", message());
     }
+}
+
+/// Where the Clear core may live, tried in order and only as far as needed:
+/// `SOAP_NATIVE_DIR`, then beside the plugin binary (the bundle's
+/// `Resources/native` on macOS, next to the `.clap` elsewhere), then the
+/// per-user folder `install-native.sh` uses.
+fn find_native_dir() -> Result<PathBuf, String> {
+    let mut tried = Vec::new();
+    let mut check = |dir: PathBuf| -> Option<PathBuf> {
+        trace(|| format!("looking in {}", dir.display()));
+        if dir.join(CORE_FILE).is_file() {
+            Some(dir)
+        } else {
+            tried.push(dir.display().to_string());
+            None
+        }
+    };
+    if let Some(dir) = std::env::var_os("SOAP_NATIVE_DIR") {
+        if let Some(found) = check(PathBuf::from(dir)) {
+            return Ok(found);
+        }
+    }
+    trace(|| "locating the plugin binary".into());
     if let Some(dir) = own_module_path().as_deref().and_then(Path::parent) {
-        dirs.push(dir.join("..").join("Resources").join("native"));
-        dirs.push(dir.join("native"));
-        dirs.push(dir.to_path_buf());
+        for candidate in [dir.join("..").join("Resources").join("native"), dir.join("native"), dir.to_path_buf()] {
+            if let Some(found) = check(candidate) {
+                return Ok(found);
+            }
+        }
     }
-    dirs.extend(default_native_dir());
-    dirs
+    trace(|| "locating the user data folder".into());
+    if let Some(found) = default_native_dir().and_then(&mut check) {
+        return Ok(found);
+    }
+    Err(format!(
+        "Clear native library not found (looked in: {}). Reinstall the plugin package.",
+        tried.join(", ")
+    ))
 }
 
 /// Path of the binary this code lives in (the plugin, not the host).
@@ -104,9 +133,21 @@ fn own_module_path() -> Option<PathBuf> {
 #[cfg(windows)]
 unsafe fn load_library(path: &Path) -> Result<Library, libloading::Error> {
     use libloading::os::windows::{Library as WinLibrary, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR};
+    use windows_sys::Win32::System::Diagnostics::Debug::{
+        SetThreadErrorMode, SEM_FAILCRITICALERRORS, SEM_NOOPENFILEERRORBOX,
+    };
+    // A missing or mismatched dependency would otherwise raise a modal system
+    // dialog that blocks the host; report it as an error instead.
+    let mut previous = 0;
+    trace(|| "SetThreadErrorMode".into());
+    SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX, &mut previous);
+    trace(|| "LoadLibraryExW".into());
     // Resolve the core's own dependencies (LiteRT, ONNX Runtime, the Swift
     // runtime) from its folder first, never from PATH or System32 copies.
-    WinLibrary::load_with_flags(path, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS).map(Into::into)
+    let result =
+        WinLibrary::load_with_flags(path, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS).map(Into::into);
+    SetThreadErrorMode(previous, std::ptr::null_mut());
+    result
 }
 
 #[cfg(not(windows))]
@@ -122,14 +163,16 @@ struct ClearLib {
     destroy: PtrFn,
     buffer_free: PtrFn,
     dir: PathBuf,
-    // Held for the lifetime of the process: the Swift core must never be unloaded.
+    // Held for the lifetime of the process (in a static): the Swift core must never be unloaded.
     _core: Library,
 }
 
 impl ClearLib {
     fn get() -> Result<&'static ClearLib, String> {
         static LIB: OnceLock<Result<ClearLib, String>> = OnceLock::new();
-        LIB.get_or_init(Self::load).as_ref().map_err(Clone::clone)
+        let lib = LIB.get_or_init(Self::load);
+        trace(|| "library initialised".into());
+        lib.as_ref().map_err(Clone::clone)
     }
 
     fn load() -> Result<ClearLib, String> {
@@ -140,24 +183,18 @@ impl ClearLib {
                 std::env::consts::ARCH
             ));
         }
-        let candidates = native_dir_candidates();
-        let dir = candidates
-            .iter()
-            .find(|d| d.join(CORE_FILE).is_file())
-            .ok_or_else(|| {
-                let tried: Vec<_> = candidates.iter().map(|d| d.display().to_string()).collect();
-                format!(
-                    "Clear native library not found (looked in: {}). Reinstall the plugin package.",
-                    tried.join(", ")
-                )
-            })?;
-        unsafe { Self::open(dir) }
+        let dir = find_native_dir()?;
+        unsafe { Self::open(&dir) }
     }
 
     unsafe fn open(dir: &Path) -> Result<ClearLib, String> {
         let err = |e: libloading::Error| format!("Could not load the Clear library: {e}");
         // On Linux the core finds libLiteRt.so beside it through its $ORIGIN runpath.
-        let core = load_library(&dir.join(CORE_FILE)).map_err(err)?;
+        trace(|| format!("loading {}", dir.join(CORE_FILE).display()));
+        // Never unloaded, not even on the error paths below: FreeLibrary on the
+        // Swift runtime deadlocks on Windows.
+        let core = std::mem::ManuallyDrop::new(load_library(&dir.join(CORE_FILE)).map_err(err)?);
+        trace(|| "resolving symbols".into());
 
         if cfg!(target_os = "linux") {
             if let Ok(curl) = core.get::<ProbeFn>(b"dal_curl_available\0") {
@@ -168,15 +205,26 @@ impl ClearLib {
         }
 
         let create_symbol = format!("{MODEL_ID}_create\0");
+        let symbol = |name: &[u8]| {
+            trace(|| format!("GetProcAddress {}", String::from_utf8_lossy(&name[..name.len() - 1])));
+            core.get::<unsafe extern "C" fn()>(name).map(|f| *f).map_err(err)
+        };
+        let create = symbol(create_symbol.as_bytes())?;
+        let is_downloaded = symbol(b"dal_is_downloaded\0")?;
+        let download = symbol(b"dal_download\0")?;
+        let run = symbol(b"dal_run\0")?;
+        let destroy = symbol(b"dal_destroy\0")?;
+        let buffer_free = symbol(b"dal_buffer_free\0")?;
+        trace(|| "Clear core ready".into());
         Ok(ClearLib {
-            create: *core.get::<CreateFn>(create_symbol.as_bytes()).map_err(err)?,
-            is_downloaded: *core.get::<HandleIntFn>(b"dal_is_downloaded\0").map_err(err)?,
-            download: *core.get::<HandleIntFn>(b"dal_download\0").map_err(err)?,
-            run: *core.get::<RunFn>(b"dal_run\0").map_err(err)?,
-            destroy: *core.get::<PtrFn>(b"dal_destroy\0").map_err(err)?,
-            buffer_free: *core.get::<PtrFn>(b"dal_buffer_free\0").map_err(err)?,
+            create: std::mem::transmute::<unsafe extern "C" fn(), CreateFn>(create),
+            is_downloaded: std::mem::transmute::<unsafe extern "C" fn(), HandleIntFn>(is_downloaded),
+            download: std::mem::transmute::<unsafe extern "C" fn(), HandleIntFn>(download),
+            run: std::mem::transmute::<unsafe extern "C" fn(), RunFn>(run),
+            destroy: std::mem::transmute::<unsafe extern "C" fn(), PtrFn>(destroy),
+            buffer_free: std::mem::transmute::<unsafe extern "C" fn(), PtrFn>(buffer_free),
             dir: dir.to_path_buf(),
-            _core: core,
+            _core: std::mem::ManuallyDrop::into_inner(core),
         })
     }
 }

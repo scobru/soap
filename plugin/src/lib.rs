@@ -4,6 +4,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{mpsc, Arc, Mutex};
 
 mod editor;
+mod theme;
 pub mod engine;
 mod state;
 mod worker;
@@ -13,8 +14,8 @@ use state::{BlockHeader, CleanTake, Command, Loudness, Monitor, Phase, RenderSet
 /// Seconds of audio the capture ring holds between worker drains.
 const RING_SECONDS: f32 = 4.0;
 
-pub struct RemoveThatDirt {
-    params: Arc<RtdParams>,
+pub struct Soap {
+    params: Arc<SoapParams>,
     shared: Arc<Shared>,
     worker_rx: Option<mpsc::Receiver<Command>>,
     worker: Option<std::thread::JoinHandle<()>>,
@@ -29,7 +30,7 @@ pub struct RemoveThatDirt {
 }
 
 #[derive(Params)]
-pub struct RtdParams {
+pub struct SoapParams {
     #[persist = "editor-state"]
     editor_state: Arc<EguiState>,
 
@@ -58,10 +59,10 @@ pub struct RtdParams {
     pub auto_process: BoolParam,
 }
 
-impl Default for RtdParams {
+impl Default for SoapParams {
     fn default() -> Self {
         Self {
-            editor_state: EguiState::from_size(520, 600),
+            editor_state: EguiState::from_size(600, 720),
             take: Arc::new(Mutex::new(None)),
             monitor: EnumParam::new("Monitor", Monitor::Clean),
             strength: FloatParam::new("Strength", 1.0, FloatRange::Linear { min: 0.0, max: 1.0 })
@@ -81,7 +82,7 @@ impl Default for RtdParams {
     }
 }
 
-impl RtdParams {
+impl SoapParams {
     pub fn render_settings(&self) -> RenderSettings {
         RenderSettings {
             strength: self.strength.value(),
@@ -93,11 +94,11 @@ impl RtdParams {
     }
 }
 
-impl Default for RemoveThatDirt {
+impl Default for Soap {
     fn default() -> Self {
         let (tx, rx) = mpsc::channel();
         Self {
-            params: Arc::new(RtdParams::default()),
+            params: Arc::new(SoapParams::default()),
             shared: Arc::new(Shared {
                 armed: Default::default(),
                 overflow: Default::default(),
@@ -118,8 +119,8 @@ impl Default for RemoveThatDirt {
     }
 }
 
-impl Plugin for RemoveThatDirt {
-    const NAME: &'static str = "Remove That Dirt";
+impl Plugin for Soap {
+    const NAME: &'static str = "Soap";
     const VENDOR: &'static str = "scobru";
     const URL: &'static str = "https://github.com/scobru/remove-that-dirt";
     const EMAIL: &'static str = "";
@@ -242,7 +243,7 @@ impl Plugin for RemoveThatDirt {
     }
 }
 
-impl RemoveThatDirt {
+impl Soap {
     fn capture_block(&mut self, buffer: &Buffer, pos: i64) {
         let (Some(headers), Some(data)) = (&mut self.headers, &mut self.data) else { return };
         let frames = buffer.samples();
@@ -274,7 +275,7 @@ fn play_take(outputs: &mut [&mut [f32]], take: &CleanTake, pos: i64) {
     }
 }
 
-impl Drop for RemoveThatDirt {
+impl Drop for Soap {
     fn drop(&mut self) {
         self.shared.send(Command::Quit);
         if let Some(worker) = self.worker.take() {
@@ -283,8 +284,8 @@ impl Drop for RemoveThatDirt {
     }
 }
 
-impl ClapPlugin for RemoveThatDirt {
-    const CLAP_ID: &'static str = "com.scobru.remove-that-dirt";
+impl ClapPlugin for Soap {
+    const CLAP_ID: &'static str = "com.scobru.soap";
     const CLAP_DESCRIPTION: Option<&'static str> =
         Some("Offline voice cleanup (denoise, dereverb, loudness) with the Desert Ant Labs Clear model");
     const CLAP_MANUAL_URL: Option<&'static str> = None;
@@ -297,7 +298,7 @@ impl ClapPlugin for RemoveThatDirt {
     ];
 }
 
-nih_export_clap!(RemoveThatDirt);
+nih_export_clap!(Soap);
 
 #[cfg(test)]
 mod tests {

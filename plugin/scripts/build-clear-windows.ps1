@@ -28,11 +28,22 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "ONNX Runtime vendoring failed" }
     }
 
+    # The shared C ABI (dal_*) lives in the NativeBindings module, which SwiftPM
+    # links in statically: on Windows only the product module's own symbols
+    # (clear_create) are exported, so export the rest explicitly.
+    $exports = "dal_is_downloaded", "dal_download", "dal_run", "dal_destroy", "dal_buffer_free", "dal_flush_telemetry"
+    $exportFlags = $exports | ForEach-Object { "-Xlinker"; "/EXPORT:$_" }
     swift build -c release --product ClearNode `
         -Xlinker /LIBPATH:Vendor/litert/lib/windows-x64 `
-        -Xlinker /LIBPATH:Vendor/onnxruntime/lib/windows-x64
+        -Xlinker /LIBPATH:Vendor/onnxruntime/lib/windows-x64 `
+        @exportFlags
     if ($LASTEXITCODE -ne 0) { throw "swift build failed" }
     $built = (Resolve-Path ".build/release/ClearNode.dll").Path
+
+    $table = & dumpbin /exports $built | Out-String
+    foreach ($symbol in @("clear_create") + $exports) {
+        if ($table -notmatch "\s$symbol\s") { throw "ClearNode.dll does not export $symbol" }
+    }
 } finally {
     Pop-Location
 }

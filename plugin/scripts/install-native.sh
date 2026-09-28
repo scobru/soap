@@ -20,7 +20,7 @@ case "$key" in
   darwin-*) data="$HOME/Library/Application Support" ;;
   *) data="${XDG_DATA_HOME:-$HOME/.local/share}" ;;
 esac
-target="${RTD_NATIVE_DIR:-$data/remove-that-dirt/native/$key}"
+target="${SOAP_NATIVE_DIR:-$data/soap-voice/native/$key}"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

@@ -1,7 +1,7 @@
 //! Run Clear on a WAV file outside a DAW, to check the native install:
 //! `cargo run --release --example enhance_wav -- in.wav out.wav`
 
-use remove_that_dirt::engine::{ClearModel, EnhanceOptions};
+use soap::engine::{ClearModel, EnhanceOptions};
 
 fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
@@ -25,29 +25,56 @@ fn main() -> Result<(), String> {
         channels[i % n].push(s);
     }
 
-    let model = ClearModel::open()?;
-    if !model.is_downloaded() {
-        eprintln!("Downloading the Clear model…");
-        model.download()?;
-    }
-    let result = model.enhance(
-        &channels,
-        spec.sample_rate as f64,
-        &EnhanceOptions {
-            strength: 1.0,
-            target_lufs: Some(-19.0),
-            peak_ceiling_dbfs: -1.5,
-            max_gain_db: 9.0,
-            output_sample_rate: 48_000.0,
-            mono_downmix: true,
-        },
-    )?;
+    // Like the plugin (and the SDK's own Node binding), call the blocking core
+    // from a worker thread rather than the main one. A watchdog names the stage
+    // that stalls instead of letting a hang run silently.
+    let stage = std::sync::Arc::new(std::sync::Mutex::new("starting"));
+    let watched = stage.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(180));
+        eprintln!("Stalled for 3 minutes at: {}", watched.lock().unwrap());
+        std::process::exit(2);
+    });
+    let sample_rate = spec.sample_rate as f64;
+    let result = std::thread::spawn(move || -> Result<_, String> {
+        let step = |name: &'static str| {
+            eprintln!("{name}");
+            *stage.lock().unwrap() = name;
+        };
+        step("[1/5] Loading the Clear library");
+        let dir = soap::engine::preload()?;
+        eprintln!("      loaded from {}", dir.display());
+        step("[2/5] Creating the model (clear_create)");
+        let model = ClearModel::open()?;
+        step("[3/5] Checking the model cache (dal_is_downloaded)");
+        if !model.is_downloaded() {
+            step("[4/5] Downloading the model (dal_download)");
+            model.download()?;
+        }
+        step("[5/5] Enhancing (dal_run)");
+        let result = model.enhance(
+            &channels,
+            sample_rate,
+            &EnhanceOptions {
+                strength: 1.0,
+                target_lufs: Some(-19.0),
+                peak_ceiling_dbfs: -1.5,
+                max_gain_db: 9.0,
+                output_sample_rate: 48_000.0,
+                mono_downmix: true,
+            },
+        )?;
+        Ok((result, channels[0].len()))
+    })
+    .join()
+    .map_err(|_| "the Clear worker thread panicked".to_string())??;
+    let (result, input_len) = result;
 
     let samples_out = &result.channels[0];
     if samples_out.is_empty() || samples_out.iter().any(|s| !s.is_finite()) {
         return Err("Clear returned empty or non-finite audio".into());
     }
-    let expected = (channels[0].len() as f64 * result.sample_rate / spec.sample_rate as f64) as usize;
+    let expected = (input_len as f64 * result.sample_rate / spec.sample_rate as f64) as usize;
     if samples_out.len().abs_diff(expected) > 480 {
         return Err(format!("unexpected output length {} (expected ~{expected})", samples_out.len()));
     }

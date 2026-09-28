@@ -1,4 +1,4 @@
-Remove That Dirt (RTD)
+Soap
 ======================
 
 Offline voice cleanup for your DAW: denoise, dereverb and loudness
@@ -17,7 +17,7 @@ On Windows the VST3 loads the CLAP from the CLAP folder: install both.
 
 Use
 ---
-  1. Insert Remove That Dirt on the voice track.
+  1. Insert Soap on the voice track.
   2. Press Capture, then play the part to clean in your DAW.
   3. When the transport stops, the take is cleaned (the model is downloaded
      once, the first time).

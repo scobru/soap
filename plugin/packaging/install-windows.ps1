@@ -1,8 +1,8 @@
-# Install Remove That Dirt (CLAP and VST3) into Common Files, where every DAW
+# Install Soap (CLAP and VST3) into Common Files, where every DAW
 # looks. Use -User to install for the current user only, without admin rights.
 param([switch]$User)
 $ErrorActionPreference = "Stop"
-$name = "Remove That Dirt"
+$name = "Soap"
 Set-Location $PSScriptRoot
 
 if ($User) {
