@@ -56,9 +56,9 @@ fn trace(message: impl FnOnce() -> String) {
 }
 
 /// Where the Clear core may live, tried in order and only as far as needed:
-/// `SOAP_NATIVE_DIR`, then beside the plugin binary (the bundle's
-/// `Resources/native` on macOS, next to the `.clap` elsewhere), then the
-/// per-user folder `install-native.sh` uses.
+/// `SOAP_NATIVE_DIR`, then beside the plugin or app binary (the bundle's
+/// `Resources/native` on macOS, next to the `.clap` or in `native/`
+/// elsewhere), then the per-user folder `install-native.sh` uses.
 fn find_native_dir() -> Result<PathBuf, String> {
     let mut tried = Vec::new();
     let mut check = |dir: PathBuf| -> Option<PathBuf> {
@@ -75,8 +75,13 @@ fn find_native_dir() -> Result<PathBuf, String> {
             return Ok(found);
         }
     }
-    trace(|| "locating the plugin binary".into());
-    if let Some(dir) = own_module_path().as_deref().and_then(Path::parent) {
+    trace(|| "locating the binary".into());
+    // The binary this code is in (the plugin inside a host), then the running
+    // executable with symlinks resolved (the desktop app, even when started
+    // through a link on PATH).
+    let exe = std::env::current_exe().and_then(std::fs::canonicalize).ok();
+    for binary in [own_module_path(), exe].into_iter().flatten() {
+        let Some(dir) = binary.parent() else { continue };
         for candidate in [dir.join("..").join("Resources").join("native"), dir.join("native"), dir.to_path_buf()] {
             if let Some(found) = check(candidate) {
                 return Ok(found);
@@ -88,7 +93,7 @@ fn find_native_dir() -> Result<PathBuf, String> {
         return Ok(found);
     }
     Err(format!(
-        "Clear native library not found (looked in: {}). Reinstall the plugin package.",
+        "Clear native library not found (looked in: {}). Reinstall Soap.",
         tried.join(", ")
     ))
 }
@@ -206,7 +211,7 @@ impl ClearLib {
 
         let create_symbol = format!("{MODEL_ID}_create\0");
         let symbol = |name: &[u8]| {
-            trace(|| format!("GetProcAddress {}", String::from_utf8_lossy(&name[..name.len() - 1])));
+            trace(|| format!("symbol {}", String::from_utf8_lossy(&name[..name.len() - 1])));
             core.get::<unsafe extern "C" fn()>(name).map(|f| *f).map_err(err)
         };
         let create = symbol(create_symbol.as_bytes())?;

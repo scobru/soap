@@ -69,18 +69,25 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: plugin
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      - run: cargo clippy -p soap -p soap-app --all-targets -- -D warnings
+      - run: cargo test -p soap -p soap-app
       - name: Package
-        run: VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-unix.sh
+        run: |
+          VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-unix.sh
+          VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-app-unix.sh
       - name: Smoke test with the real model
         timeout-minutes: 15
         run: |
           python3 scripts/make-test-wav.py noisy.wav
           SOAP_NATIVE_DIR=target/native/linux-x64 cargo run --release --example enhance_wav -- noisy.wav clean.wav
+      - name: Smoke test the packaged app
+        timeout-minutes: 10
+        run: |
+          app=$(find target/dist -maxdepth 1 -type d -name 'soap-app-*-linux' | head -1)
+          "$app/Soap/soap" --clean noisy.wav clean-app.wav
       - uses: actions/upload-artifact@v5
         with:
-          name: plugin-linux
+          name: soap-linux
           path: plugin/target/dist/*.zip
 
   macos:
@@ -95,14 +102,24 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: plugin
-      - run: cargo test
+      - run: cargo test -p soap -p soap-app
+      - run: cargo clippy -p soap-app --all-targets -- -D warnings
       - name: Package
-        run: VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-unix.sh
+        run: |
+          VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-unix.sh
+          VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-app-unix.sh
       - name: Smoke test with the real model
         timeout-minutes: 15
         run: |
           python3 scripts/make-test-wav.py noisy.wav
           SOAP_NATIVE_DIR=target/native/darwin-arm64 cargo run --release --example enhance_wav -- noisy.wav clean.wav
+      - name: Smoke test the packaged app
+        timeout-minutes: 10
+        run: |
+          app=$(find target/dist -maxdepth 1 -type d -name 'soap-app-*-macos' | head -1)/Soap.app
+          codesign --verify --verbose "$app"
+          plutil -lint "$app/Contents/Info.plist"
+          "$app/Contents/MacOS/Soap" --clean noisy.wav clean-app.wav
       - name: Validate the Audio Unit
         run: |
           pkg=$(find target/dist -maxdepth 1 -type d -name 'soap-*-macos' | head -1)
@@ -113,7 +130,7 @@ jobs:
           auval -v aufx Soap Scbr
       - uses: actions/upload-artifact@v5
         with:
-          name: plugin-macos
+          name: soap-macos
           path: plugin/target/dist/*.zip
 
   clear-windows:
@@ -162,10 +179,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: plugin
-      - run: cargo test
+      - run: cargo test -p soap -p soap-app
       - name: Package
         shell: pwsh
-        run: ./scripts/package-windows.ps1 -Version ($env:GITHUB_REF_NAME -replace '/', '-') -ClearDir clear-windows-x64
+        run: |
+          ./scripts/package-windows.ps1 -Version ($env:GITHUB_REF_NAME -replace '/', '-') -ClearDir clear-windows-x64
+          ./scripts/package-app-windows.ps1 -Version ($env:GITHUB_REF_NAME -replace '/', '-') -ClearDir clear-windows-x64
       - name: Probe the Clear DLLs
         timeout-minutes: 10
         shell: pwsh
@@ -189,9 +208,20 @@ jobs:
           $env:SOAP_NATIVE_DIR = (Resolve-Path clear-windows-x64).Path
           cargo run --release --example enhance_wav -- noisy.wav clean.wav
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke test the packaged app
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          # A windowed exe: PowerShell doesn't wait for it on its own.
+          $app = Get-ChildItem target/dist -Directory -Filter "soap-app-*-windows" | Select-Object -First 1
+          $p = Start-Process -FilePath (Join-Path $app.FullName "Soap/Soap.exe") -ArgumentList "--clean", "noisy.wav", "clean-app.wav" `
+            -NoNewWindow -PassThru -RedirectStandardError app.log
+          if (-not $p.WaitForExit(480000)) { Stop-Process -Id $p.Id -Force; Get-Content app.log; throw "the app did not finish" }
+          Get-Content app.log
+          if ($p.ExitCode -ne 0) { throw "the app failed with exit code $($p.ExitCode)" }
       - uses: actions/upload-artifact@v5
         with:
-          name: plugin-windows
+          name: soap-windows
           path: plugin/target/dist/*.zip
 
   release:
@@ -204,7 +234,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v5
         with:
-          pattern: plugin-*
+          pattern: soap-*
           merge-multiple: true
           path: dist
       - uses: softprops/action-gh-release@v2

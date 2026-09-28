@@ -5,20 +5,21 @@
 <p align="center"><b>Voice cleaner</b>: denoise, dereverb and loudness, entirely on your device.</p>
 
 <p align="center">
-  <img src="assets/screenshot-plugin.png" width="360" alt="The Soap plugin">
-  <img src="assets/screenshot-web.png" width="480" alt="The Soap web app">
+  <img src="assets/screenshot-plugin.png" width="300" alt="The Soap plugin">
+  <img src="assets/screenshot-app.png" width="300" alt="The Soap desktop app">
+  <img src="assets/screenshot-web.png" width="400" alt="The Soap web app">
 </p>
 
 Voice cleanup (denoise, dereverb, loudness normalization) built on
 [Clear](https://desertant.com/models/clear/) from Desert Ant Labs, a fine-tuned
-DeepFilterNet 3 that runs entirely on-device. It comes in two forms:
+DeepFilterNet 3 that runs entirely on-device. It comes in three forms:
 
-| | `web/` | `plugin/` |
-|---|---|---|
-| What it is | Static browser app | Audio plugin: **VST3, AU, CLAP** |
-| Platforms | Any modern browser | **Windows x64**, **macOS Apple Silicon (14+)**, Linux x64 |
-| Runtime | WebAssembly + LiteRT.js (CPU) or WebGPU | Native Clear core: LiteRT on Windows/Linux, Core ML on macOS |
-| Workflow | Load or record a file, clean it, compare, export WAV | Capture a track region, clean it, play back on the timeline |
+| | `plugin/` | `plugin/app/` | `web/` |
+|---|---|---|---|
+| What it is | Audio plugin: **VST3, AU, CLAP** | **Desktop app** | Static browser app |
+| Platforms | **Windows x64**, **macOS Apple Silicon (14+)**, Linux x64 | **Windows x64**, **macOS Apple Silicon (14+)**, Linux x64 | Any modern browser |
+| Runtime | Native Clear core: LiteRT on Windows/Linux, Core ML on macOS | Same native core as the plugin | WebAssembly + LiteRT.js (CPU) or WebGPU |
+| Workflow | Capture a track region, clean it, play back on the timeline | Open a file, clean it, compare A/B, save WAV | Load or record a file, clean it, compare, export WAV |
 
 Clear processes whole takes, not a real-time stream: loudness normalization
 measures the integrated LUFS of the whole take, and even its streaming mode
@@ -28,8 +29,8 @@ works in 2-second windows. So the plugin works "offline", Melodyne style.
 
 ### Download and install
 
-Every tag `vX.Y.Z` publishes a GitHub Release with three packages (every push
-also leaves them as Actions artifacts):
+Every tag `vX.Y.Z` publishes a GitHub Release with the plugin and app
+packages below (every push also leaves them as Actions artifacts):
 
 | Package | Contents | Install |
 |---|---|---|
@@ -94,14 +95,45 @@ To try the model outside a DAW:
 `.github/workflows/build.yml` runs on every push:
 
 - `cargo clippy -D warnings` and unit tests: FFI payloads (same format as the SDK's `codec.js`), timeline capture, playback, WAV, resampling.
-- A build and package for Windows, macOS, and Linux.
-- A **smoke test with the real model** on all three platforms: a noisy file cleaned through the native core, checking duration and that the output has no NaN or infinity.
+- A build and package of the plugin and the desktop app for Windows, macOS, and Linux.
+- A **smoke test with the real model** on all three platforms: a noisy file cleaned through the native core, checking duration and that the output has no NaN or infinity, then again through each packaged app (`--clean`).
 - **`auval`** on the macOS Audio Unit.
 - A **browser E2E test** (Playwright + Chromium) of the web app with the real model.
 
 The Linux VST3 passes all 47 tests of Steinberg's `validator`, and the CLAP passes
 `clap-validator` except for the `state-reproducibility-*` tests, which nih-plug's own
 examples fail too.
+
+## Desktop app (`plugin/app`)
+
+The same cleaning without a DAW: drop a recording on the window (WAV, AIFF,
+FLAC, MP3, M4A/AAC, ALAC, Ogg Vorbis), Soap washes it right away, then you
+compare the original (A) and clean (B) versions on the same timeline and save
+a WAV (16-bit or 32-bit float, 48 or 44.1 kHz).
+
+| Package | Contents | Install |
+|---|---|---|
+| `soap-app-…-windows.zip` | `Soap\Soap.exe` with the Clear DLLs | `install.cmd` → `%LOCALAPPDATA%\Programs\Soap` + Start menu, or run `Soap.exe` in place |
+| `soap-app-…-macos.zip` | `Soap.app` | Drag it to Applications |
+| `soap-app-…-linux.zip` | `Soap/soap` with the Clear core | `./install.sh` → applications menu + `soap` command |
+
+- It's a native Rust app (eframe/egui with the plugin's theme, Symphonia for
+  decoding, cpal for playback) that loads the same Clear core as the plugin,
+  from `Soap.app/Contents/Resources/native`, beside `Soap.exe`, or `native/`
+  beside `soap`.
+- Space plays and pauses, `A`/`B` switch versions without losing the
+  position, and clicking a waveform jumps there. Settings are remembered.
+- `soap --clean input.mp3 output.wav [--loudness podcast|stream|tv|off]
+  [--strength 0-100] [--stereo] [--rate 44100] [--float]` runs the same
+  pipeline without a window. CI uses it to test every package with the real
+  model.
+- The builds aren't notarized or code-signed: macOS asks you to allow the app
+  once in System Settings → Privacy & Security, and Windows SmartScreen shows
+  "More info → Run anyway".
+
+Build it with `cargo run --release -p soap-app` (it needs the Clear core:
+`SOAP_NATIVE_DIR`, as for `enhance_wav`), or package it with
+`./scripts/package-app-unix.sh` / `./scripts/package-app-windows.ps1`.
 
 ## Web interface (`web/`)
 
@@ -130,7 +162,7 @@ the host must send `Cross-Origin-Opener-Policy: same-origin` and
   - Desert Ant Labs must be credited (the web UI and the plugin do this).
   - You may not use the model or its outputs to train competing models.
   - The SDK sends Desert Ant Labs an active-device count. It never sends the audio.
-- **nih-plug** is ISC and **clap-wrapper** is MIT. The **VST3 SDK** (MIT since 2025) and **AudioUnitSDK** (Apache 2.0) are fetched at build time. There are no GPL components: VST3 comes from clap-wrapper, not from nih-plug's GPLv3 export.
+- **nih-plug** is ISC and **clap-wrapper** is MIT. The app uses **eframe/egui**, **Symphonia**, **cpal** and **rfd** (MIT/Apache 2.0 or MPL 2.0 for Symphonia). The **VST3 SDK** (MIT since 2025) and **AudioUnitSDK** (Apache 2.0) are fetched at build time. There are no GPL components: VST3 comes from clap-wrapper, not from nih-plug's GPLv3 export.
 - The **Nunito** font (plugin and web app) is under the SIL Open Font License 1.1 (`plugin/assets/fonts/OFL.txt`).
 - The logo and icons (`assets/`, `web/public/`) are part of this project.
 - VST is a trademark of Steinberg Media Technologies GmbH.

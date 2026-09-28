@@ -7,7 +7,7 @@ description = "Offline voice cleanup plugin (CLAP, VST3 and AU via clap-wrapper)
 publish = false
 
 [workspace]
-members = ["xtask"]
+members = ["app", "xtask"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
