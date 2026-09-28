@@ -1,6 +1,7 @@
 import "@fontsource/nunito/600.css";
 import "@fontsource/nunito/800.css";
 import type { Clear as ClearInstance, ClearResult, EnhanceOptions, LoudnessPreset } from "@desert-ant-labs/clear";
+import { applyLanguage, getCurrentLanguage, onLanguageChange, setLanguage, t } from "./i18n";
 import { encodeWav, type WavFormat } from "./wav";
 import { Waveform } from "./waveform";
 
@@ -51,6 +52,33 @@ let clearAccelerator: string | null = null;
 let loading: Promise<ClearInstance> | null = null;
 let busy = false;
 
+// --- Language switch --------------------------------------------------------
+
+document.querySelectorAll<HTMLButtonElement>(".lang-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const lang = btn.dataset.lang as "it" | "en";
+    if (lang) setLanguage(lang);
+  });
+});
+
+onLanguageChange(() => {
+  if (clear && clearAccelerator) {
+    setModelStatus("ready", t("modelStatusReady")(clearAccelerator === "webgpu" ? "GPU" : "CPU"));
+  } else if (!loading) {
+    setModelStatus("idle", t("modelStatusIdle"));
+  }
+  ui.process.textContent = busy ? t("processButtonBusy") : t("processButton");
+  ui.record.textContent = recorder ? t("recordStop") : t("recordMic");
+  ui.play.textContent = player.playing ? t("pauseBtn") : t("playBtn");
+  if (result) {
+    ui.statRtf.textContent = t("realtimeFactor")(result.realtimeFactor.toFixed(1));
+  }
+  if (source) {
+    const seconds = source.channels[0].length / source.sampleRate;
+    ui.sourceInfo.textContent = `${source.name} · ${formatTime(seconds)} · ${source.channels.length === 2 ? "stereo" : "mono"}`;
+  }
+});
+
 // --- Model -----------------------------------------------------------------
 
 function setModelStatus(state: "idle" | "loading" | "ready" | "error", text: string) {
@@ -65,31 +93,31 @@ async function getModel(): Promise<ClearInstance> {
 
   clear?.dispose();
   clear = null;
-  setModelStatus("loading", "Caricamento runtime…");
+  setModelStatus("loading", t("modelStatusLoadingRuntime"));
   loading = (async () => {
     const { Clear } = await import("@desert-ant-labs/clear");
-    setModelStatus("loading", "Download modello…");
+    setModelStatus("loading", t("modelStatusDownloadingModel"));
     const model = await Clear.load({
       accelerator,
       litertWasmDir: new URL("litert/", document.baseURI).href,
       modelBaseUrl: import.meta.env.VITE_CLEAR_MODEL_BASE_URL || undefined,
       onProgress: (fraction) => {
-        setModelStatus("loading", `Download modello ${Math.round(fraction * 100)}%`);
+        setModelStatus("loading", t("modelStatusDownloadingPct")(Math.round(fraction * 100)));
         setProgress(fraction);
       },
     });
     clear = model;
     clearAccelerator = accelerator;
-    setModelStatus("ready", `Modello pronto · ${accelerator === "webgpu" ? "GPU" : "CPU"}`);
+    setModelStatus("ready", t("modelStatusReady")(accelerator === "webgpu" ? "GPU" : "CPU"));
     return model;
   })();
   try {
     return await loading;
   } catch (err) {
-    setModelStatus("error", "Errore nel caricamento del modello");
+    setModelStatus("error", t("modelStatusError"));
     const offline = /download failed|Failed to fetch/i.test(String(err));
     throw offline
-      ? new Error("Impossibile scaricare il modello da Hugging Face. Controlla la connessione e riprova.", { cause: err })
+      ? new Error(t("errorHuggingFace"), { cause: err })
       : err;
   } finally {
     loading = null;
@@ -100,7 +128,6 @@ async function getModel(): Promise<ClearInstance> {
 // --- Input -----------------------------------------------------------------
 
 async function decodeToModelRate(blob: Blob): Promise<{ channels: Float32Array[]; sampleRate: number }> {
-  // An OfflineAudioContext at 48 kHz decodes and resamples in one step.
   const ctx = new OfflineAudioContext(1, 1, MODEL_RATE);
   const buffer = await ctx.decodeAudioData(await blob.arrayBuffer());
   const channels = Array.from({ length: Math.min(2, buffer.numberOfChannels) }, (_, i) =>
@@ -111,7 +138,7 @@ async function decodeToModelRate(blob: Blob): Promise<{ channels: Float32Array[]
 
 async function loadSource(blob: Blob, name: string) {
   showError(null);
-  ui.sourceInfo.textContent = "Decodifica in corso…";
+  ui.sourceInfo.textContent = t("decoding");
   try {
     const decoded = await decodeToModelRate(blob);
     source = { name, ...decoded };
@@ -132,7 +159,7 @@ async function loadSource(blob: Blob, name: string) {
   } catch (err) {
     source = null;
     ui.sourceInfo.textContent = "";
-    showError(new Error("Impossibile decodificare questo file. Prova con WAV, MP3 o M4A.", { cause: err }));
+    showError(new Error(t("decodeError"), { cause: err }));
     refreshButtons();
   }
 }
@@ -166,7 +193,6 @@ ui.record.addEventListener("click", async () => {
   }
   showError(null);
   try {
-    // Browser DSP off, so the comparison is against the raw mic signal.
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
     });
@@ -182,17 +208,17 @@ ui.record.addEventListener("click", async () => {
       clearInterval(timer);
       stream.getTracks().forEach((t) => t.stop());
       recorder = null;
-      ui.record.textContent = "● Registra dal microfono";
+      ui.record.textContent = t("recordMic");
       ui.record.classList.remove("recording");
       ui.recordTime.textContent = "";
       const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-      loadSource(new Blob(chunks, { type: rec.mimeType }), `registrazione-${stamp}`);
+      loadSource(new Blob(chunks, { type: rec.mimeType }), `${t("recordPrefix")}-${stamp}`);
     };
     rec.start();
-    ui.record.textContent = "■ Stop";
+    ui.record.textContent = t("recordStop");
     ui.record.classList.add("recording");
   } catch (err) {
-    showError(new Error("Accesso al microfono negato o non disponibile.", { cause: err }));
+    showError(new Error(t("micError"), { cause: err }));
   }
 });
 
@@ -210,7 +236,7 @@ ui.loudness.addEventListener("change", () => {
 });
 ui.accelerator.addEventListener("change", () => {
   if (ui.accelerator.value === "webgpu" && !("gpu" in navigator)) {
-    showError(new Error("WebGPU non è disponibile in questo browser: uso la CPU."));
+    showError(new Error(t("webgpuUnavailable")));
     ui.accelerator.value = "wasm";
   }
   if (clear) getModel().catch(showError);
@@ -244,8 +270,7 @@ ui.process.addEventListener("click", async () => {
   try {
     const model = await getModel();
     setProgress(null);
-    ui.process.textContent = "Insapono…";
-    // Let the button repaint before the wasm core takes the main thread.
+    ui.process.textContent = t("processButtonBusy");
     await new Promise((r) => setTimeout(r, 30));
     const input = source.channels.length > 1 ? source.channels : source.channels[0];
     result = await model.enhance(input, source.sampleRate, readOptions());
@@ -255,7 +280,7 @@ ui.process.addEventListener("click", async () => {
   } finally {
     busy = false;
     document.body.classList.remove("foaming");
-    ui.process.textContent = "Pulisci la voce";
+    ui.process.textContent = t("processButton");
     ui.progress.hidden = true;
     refreshButtons();
   }
@@ -281,7 +306,7 @@ function showResult(r: ClearResult) {
   ui.statLufs.textContent = r.measuredLUFS === null ? "–" : `${r.measuredLUFS.toFixed(1)} LUFS`;
   ui.statPeak.textContent = r.measuredTruePeakDBFS === null ? "–" : `${r.measuredTruePeakDBFS.toFixed(1)} dBTP`;
   ui.statDur.textContent = formatTime(r.durationSec);
-  ui.statRtf.textContent = `${r.realtimeFactor.toFixed(1)}× tempo reale`;
+  ui.statRtf.textContent = t("realtimeFactor")(r.realtimeFactor.toFixed(1));
   ui.stats.hidden = false;
 }
 
@@ -413,7 +438,7 @@ function setAB(side: "orig" | "clean") {
 }
 
 function onPlayerChange() {
-  ui.play.textContent = player.playing ? "❚❚ Pausa" : "▶ Play";
+  ui.play.textContent = player.playing ? t("pauseBtn") : t("playBtn");
   const pos = player.position;
   const dur = player.duration;
   ui.clock.textContent = `${formatTime(pos)} / ${formatTime(dur)}`;
@@ -476,5 +501,7 @@ function formatTime(seconds: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+// Initial language setup & state
+applyLanguage(getCurrentLanguage());
 refreshButtons();
 setAB("orig");

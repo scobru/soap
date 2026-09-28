@@ -24,12 +24,16 @@
               by <span>scobru</span>
             </a>
           </div>
-          <p class="sub">Denoise, dereverb e loudness per registrazioni vocali. L'audio non lascia mai il tuo dispositivo.</p>
+          <p class="sub" data-i18n="brandSubtitle">Denoise, dereverb e loudness per registrazioni vocali. L'audio non lascia mai il tuo dispositivo.</p>
         </div>
       </div>
       <div class="top-actions">
+        <div class="lang-switch" role="group" aria-label="Language selector">
+          <button type="button" class="lang-btn" data-lang="it" aria-pressed="true">IT</button>
+          <button type="button" class="lang-btn" data-lang="en" aria-pressed="false">EN</button>
+        </div>
         <div class="model-status" id="model-status" data-state="idle">
-          <span class="dot"></span><span id="model-status-text">Modello non caricato</span>
+          <span class="dot"></span><span id="model-status-text" data-i18n="modelStatusIdle">Modello non caricato</span>
         </div>
         <a href="https://github.com/scobru/soap" target="_blank" rel="noopener" class="top-btn" title="Codice sorgente su GitHub">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
@@ -42,58 +46,58 @@
 
     <main class="layout">
       <section class="panel input-panel">
-        <h2>1 · Sorgente</h2>
+        <h2 data-i18n="sectionSource">1 · Sorgente</h2>
         <label class="drop" id="drop">
           <input type="file" id="file" accept="audio/*,video/*" hidden />
-          <strong>Trascina qui un file audio</strong>
-          <span>oppure clicca per sceglierlo (WAV, MP3, M4A, OGG, FLAC, video…)</span>
+          <strong data-i18n="dropTitle">Trascina qui un file audio</strong>
+          <span data-i18n="dropSubtitle">oppure clicca per sceglierlo (WAV, MP3, M4A, OGG, FLAC, video…)</span>
         </label>
         <div class="row">
-          <button id="record" class="secondary" type="button">● Registra dal microfono</button>
+          <button id="record" class="secondary" type="button" data-i18n="recordMic">● Registra dal microfono</button>
           <span id="record-time" class="muted"></span>
         </div>
         <p id="source-info" class="muted"></p>
       </section>
 
       <section class="panel settings-panel">
-        <h2>2 · Impostazioni</h2>
+        <h2 data-i18n="sectionSettings">2 · Impostazioni</h2>
         <div class="field">
-          <label for="strength">Intensità <output id="strength-out">100%</output></label>
+          <label for="strength"><span data-i18n="labelStrength">Intensità</span> <output id="strength-out">100%</output></label>
           <input type="range" id="strength" min="0" max="100" value="100" />
-          <small>Miscela tra originale e voce pulita. Abbassala se il risultato suona troppo processato.</small>
+          <small data-i18n="helpStrength">Miscela tra originale e voce pulita. Abbassala se il risultato suona troppo processato.</small>
         </div>
         <div class="field">
-          <label for="loudness">Loudness di destinazione</label>
+          <label for="loudness" data-i18n="labelLoudness">Loudness di destinazione</label>
           <select id="loudness">
-            <option value="applePodcasts">Apple Podcasts · −19 LUFS</option>
-            <option value="spotify">Spotify / YouTube · −14 LUFS</option>
-            <option value="broadcast">Broadcast EBU R128 · −23 LUFS</option>
-            <option value="custom">Personalizzata…</option>
-            <option value="off">Nessuna (livello del modello)</option>
+            <option value="applePodcasts" data-i18n="loudnessApple">Apple Podcasts · −19 LUFS</option>
+            <option value="spotify" data-i18n="loudnessSpotify">Spotify / YouTube · −14 LUFS</option>
+            <option value="broadcast" data-i18n="loudnessBroadcast">Broadcast EBU R128 · −23 LUFS</option>
+            <option value="custom" data-i18n="loudnessCustom">Personalizzata…</option>
+            <option value="off" data-i18n="loudnessOff">Nessuna (livello del modello)</option>
           </select>
           <input type="number" id="custom-lufs" value="-16" step="0.5" min="-40" max="-6" hidden aria-label="LUFS personalizzati" />
         </div>
         <div class="field two">
           <div>
-            <label for="ceiling">True peak max (dBTP)</label>
+            <label for="ceiling" data-i18n="labelCeiling">True peak max (dBTP)</label>
             <input type="number" id="ceiling" value="-1.5" step="0.1" max="0" min="-12" />
           </div>
           <div>
-            <label for="max-gain">Guadagno max (dB)</label>
+            <label for="max-gain" data-i18n="labelMaxGain">Guadagno max (dB)</label>
             <input type="number" id="max-gain" value="9" step="1" min="0" max="30" />
           </div>
         </div>
         <div class="field two">
           <div>
-            <label for="channels">Canali</label>
+            <label for="channels" data-i18n="labelChannels">Canali</label>
             <select id="channels">
-              <option value="mono">Mono</option>
-              <option value="preserve">Mantieni stereo</option>
+              <option value="mono" data-i18n="channelMono">Mono</option>
+              <option value="preserve" data-i18n="channelPreserve">Mantieni stereo</option>
             </select>
-            <small>Lo stereo richiede un passaggio per canale (~1,8×).</small>
+            <small data-i18n="helpChannels">Lo stereo richiede un passaggio per canale (~1,8×).</small>
           </div>
           <div>
-            <label for="rate">Sample rate uscita</label>
+            <label for="rate" data-i18n="labelRate">Sample rate uscita</label>
             <select id="rate">
               <option value="48000">48 kHz</option>
               <option value="44100">44,1 kHz</option>
@@ -102,57 +106,57 @@
         </div>
         <div class="field two">
           <div>
-            <label for="accelerator">Accelerazione</label>
+            <label for="accelerator" data-i18n="labelAccelerator">Accelerazione</label>
             <select id="accelerator">
-              <option value="wasm">CPU (WebAssembly)</option>
-              <option value="webgpu">GPU (WebGPU)</option>
+              <option value="wasm" data-i18n="accWasm">CPU (WebAssembly)</option>
+              <option value="webgpu" data-i18n="accWebgpu">GPU (WebGPU)</option>
             </select>
           </div>
           <div>
-            <label for="format">Formato WAV</label>
+            <label for="format" data-i18n="labelFormat">Formato WAV</label>
             <select id="format">
               <option value="pcm16">16-bit PCM</option>
               <option value="float32">32-bit float</option>
             </select>
           </div>
         </div>
-        <button id="process" class="primary" type="button" disabled>Pulisci la voce</button>
+        <button id="process" class="primary" type="button" disabled data-i18n="processButton">Pulisci la voce</button>
         <div class="progress" id="progress" hidden><div class="bar" id="progress-bar"></div></div>
         <p id="error" class="error" role="alert" hidden></p>
       </section>
 
       <section class="panel compare-panel">
-        <h2>3 · Confronto</h2>
+        <h2 data-i18n="sectionCompare">3 · Confronto</h2>
         <div class="track">
-          <div class="track-head"><span class="tag orig">Originale</span></div>
+          <div class="track-head"><span class="tag orig" data-i18n="tagOrig">Originale</span></div>
           <canvas id="wave-orig" class="wave"></canvas>
         </div>
         <div class="track">
-          <div class="track-head"><span class="tag clean">Pulito</span></div>
+          <div class="track-head"><span class="tag clean" data-i18n="tagClean">Pulito</span></div>
           <canvas id="wave-clean" class="wave"></canvas>
         </div>
         <div class="transport">
-          <button id="play" class="secondary" type="button" disabled>▶ Play</button>
+          <button id="play" class="secondary" type="button" disabled data-i18n="playBtn">▶ Play</button>
           <div class="ab" role="radiogroup" aria-label="Ascolta">
-            <button id="ab-orig" type="button" role="radio" aria-checked="false">A · Originale</button>
-            <button id="ab-clean" type="button" role="radio" aria-checked="true">B · Pulito</button>
+            <button id="ab-orig" type="button" role="radio" aria-checked="false" data-i18n="abOrigBtn">A · Originale</button>
+            <button id="ab-clean" type="button" role="radio" aria-checked="true" data-i18n="abCleanBtn">B · Pulito</button>
           </div>
           <span id="clock" class="muted">0:00 / 0:00</span>
-          <a id="download" class="primary link" hidden>Scarica WAV</a>
+          <a id="download" class="primary link" hidden data-i18n="downloadWav">Scarica WAV</a>
         </div>
         <dl class="stats" id="stats" hidden>
-          <div><dt>Loudness in ingresso</dt><dd id="stat-lufs">–</dd></div>
-          <div><dt>True peak in uscita</dt><dd id="stat-peak">–</dd></div>
-          <div><dt>Durata</dt><dd id="stat-dur">–</dd></div>
-          <div><dt>Velocità</dt><dd id="stat-rtf">–</dd></div>
+          <div><dt data-i18n="statInputLufs">Loudness in ingresso</dt><dd id="stat-lufs">–</dd></div>
+          <div><dt data-i18n="statOutputPeak">True peak in uscita</dt><dd id="stat-peak">–</dd></div>
+          <div><dt data-i18n="statDuration">Durata</dt><dd id="stat-dur">–</dd></div>
+          <div><dt data-i18n="statSpeed">Velocità</dt><dd id="stat-rtf">–</dd></div>
         </dl>
-        <p class="hint muted"><kbd>Spazio</kbd> play/pausa, <kbd>A</kbd>/<kbd>B</kbd> per passare tra originale e pulito senza perdere la posizione.</p>
+        <p class="hint muted" data-i18n-html="keyboardHint"><kbd>Spazio</kbd> play/pausa, <kbd>A</kbd>/<kbd>B</kbd> per passare tra originale e pulito senza perdere la posizione.</p>
       </section>
     </main>
 
     <footer class="foot">
       <div class="foot-main">
-        <div class="foot-dev">
+        <div class="foot-dev" data-i18n-html="footDev">
           <strong>Soap</strong> · Sviluppato da <a href="https://scobrudot.dev" target="_blank" rel="noopener"><strong>scobru</strong> (Francesco Bruno)</a>
         </div>
         <div class="foot-links">
@@ -160,15 +164,15 @@
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="currentColor">
               <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
             </svg>
-            Repository GitHub
+            <span data-i18n="footRepo">Repository GitHub</span>
           </a>
           <a href="https://github.com/scobru/soap/releases" target="_blank" rel="noopener" class="foot-link">
-            Plugin VST3 / CLAP / AU
+            <span data-i18n="footPlugin">Plugin VST3 / CLAP / AU</span>
           </a>
         </div>
       </div>
-      <div class="foot-credits">
-        Voice enhancement by <a href="https://desertant.com/models/clear/" target="_blank" rel="noopener">Clear</a> from
+      <div class="foot-credits" data-i18n-html="footCredits">
+        Voice enhancement powered by <a href="https://desertant.com/models/clear/" target="_blank" rel="noopener">Clear</a> from
         Desert Ant Labs (fine-tuned DeepFilterNet 3), under the
         <a href="https://license.desertant.com/1.0" target="_blank" rel="noopener">Desert Ant Labs Source-Available License</a>.
         I pesi vengono scaricati da Hugging Face al primo uso e poi restano in cache; l'audio non lascia mai il tuo dispositivo.
