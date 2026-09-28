@@ -19,6 +19,9 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# clap-wrapper links its own targets against the static MSVC runtime unless
+# told otherwise; the wrapper targets defined here must match it.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(SOAP_NAME "Soap")
 set(SOAP_CLAP_BUNDLE "" CACHE PATH "Path to the built '${SOAP_NAME}.clap' (embedded on macOS)")
 
