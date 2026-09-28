@@ -170,6 +170,7 @@ jobs:
         timeout-minutes: 15
         shell: pwsh
         run: |
+          Get-ChildItem clear-windows-x64 | Format-Table Name, Length
           python scripts/make-test-wav.py noisy.wav
           $env:SOAP_NATIVE_DIR = (Resolve-Path clear-windows-x64).Path
           cargo run --release --example enhance_wav -- noisy.wav clean.wav

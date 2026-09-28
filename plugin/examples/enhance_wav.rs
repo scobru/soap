@@ -26,18 +26,32 @@ fn main() -> Result<(), String> {
     }
 
     // Like the plugin (and the SDK's own Node binding), call the blocking core
-    // from a worker thread rather than the main one.
+    // from a worker thread rather than the main one. A watchdog names the stage
+    // that stalls instead of letting a hang run silently.
+    let stage = std::sync::Arc::new(std::sync::Mutex::new("starting"));
+    let watched = stage.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(180));
+        eprintln!("Stalled for 3 minutes at: {}", watched.lock().unwrap());
+        std::process::exit(2);
+    });
     let sample_rate = spec.sample_rate as f64;
     let result = std::thread::spawn(move || -> Result<_, String> {
-        eprintln!("[1/3] Loading the Clear core...");
+        let step = |name: &'static str| {
+            eprintln!("{name}");
+            *stage.lock().unwrap() = name;
+        };
+        step("[1/5] Loading the Clear library");
+        let dir = soap::engine::preload()?;
+        eprintln!("      loaded from {}", dir.display());
+        step("[2/5] Creating the model (clear_create)");
         let model = ClearModel::open()?;
+        step("[3/5] Checking the model cache (dal_is_downloaded)");
         if !model.is_downloaded() {
-            eprintln!("[2/3] Downloading the Clear model...");
+            step("[4/5] Downloading the model (dal_download)");
             model.download()?;
-        } else {
-            eprintln!("[2/3] Model already cached");
         }
-        eprintln!("[3/3] Enhancing {:.1}s of audio...", channels[0].len() as f64 / sample_rate);
+        step("[5/5] Enhancing (dal_run)");
         let result = model.enhance(
             &channels,
             sample_rate,

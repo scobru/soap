@@ -104,9 +104,19 @@ fn own_module_path() -> Option<PathBuf> {
 #[cfg(windows)]
 unsafe fn load_library(path: &Path) -> Result<Library, libloading::Error> {
     use libloading::os::windows::{Library as WinLibrary, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR};
+    use windows_sys::Win32::System::Diagnostics::Debug::{
+        SetThreadErrorMode, SEM_FAILCRITICALERRORS, SEM_NOOPENFILEERRORBOX,
+    };
+    // A missing or mismatched dependency would otherwise raise a modal system
+    // dialog that blocks the host; report it as an error instead.
+    let mut previous = 0;
+    SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX, &mut previous);
     // Resolve the core's own dependencies (LiteRT, ONNX Runtime, the Swift
     // runtime) from its folder first, never from PATH or System32 copies.
-    WinLibrary::load_with_flags(path, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS).map(Into::into)
+    let result =
+        WinLibrary::load_with_flags(path, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS).map(Into::into);
+    SetThreadErrorMode(previous, std::ptr::null_mut());
+    result
 }
 
 #[cfg(not(windows))]
