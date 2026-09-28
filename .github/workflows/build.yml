@@ -39,6 +39,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: End-to-end with the real model
+        timeout-minutes: 15
         run: |
           npm install --no-save playwright
           npx playwright install --with-deps chromium
@@ -73,6 +74,7 @@ jobs:
       - name: Package
         run: VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-unix.sh
       - name: Smoke test with the real model
+        timeout-minutes: 15
         run: |
           python3 scripts/make-test-wav.py noisy.wav
           SOAP_NATIVE_DIR=target/native/linux-x64 cargo run --release --example enhance_wav -- noisy.wav clean.wav
@@ -97,6 +99,7 @@ jobs:
       - name: Package
         run: VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-unix.sh
       - name: Smoke test with the real model
+        timeout-minutes: 15
         run: |
           python3 scripts/make-test-wav.py noisy.wav
           SOAP_NATIVE_DIR=target/native/darwin-arm64 cargo run --release --example enhance_wav -- noisy.wav clean.wav
@@ -164,6 +167,7 @@ jobs:
         shell: pwsh
         run: ./scripts/package-windows.ps1 -Version ($env:GITHUB_REF_NAME -replace '/', '-') -ClearDir clear-windows-x64
       - name: Smoke test with the real model
+        timeout-minutes: 15
         shell: pwsh
         run: |
           python scripts/make-test-wav.py noisy.wav

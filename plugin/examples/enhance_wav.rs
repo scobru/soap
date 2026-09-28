@@ -25,29 +25,42 @@ fn main() -> Result<(), String> {
         channels[i % n].push(s);
     }
 
-    let model = ClearModel::open()?;
-    if !model.is_downloaded() {
-        eprintln!("Downloading the Clear model…");
-        model.download()?;
-    }
-    let result = model.enhance(
-        &channels,
-        spec.sample_rate as f64,
-        &EnhanceOptions {
-            strength: 1.0,
-            target_lufs: Some(-19.0),
-            peak_ceiling_dbfs: -1.5,
-            max_gain_db: 9.0,
-            output_sample_rate: 48_000.0,
-            mono_downmix: true,
-        },
-    )?;
+    // Like the plugin (and the SDK's own Node binding), call the blocking core
+    // from a worker thread rather than the main one.
+    let sample_rate = spec.sample_rate as f64;
+    let result = std::thread::spawn(move || -> Result<_, String> {
+        eprintln!("[1/3] Loading the Clear core...");
+        let model = ClearModel::open()?;
+        if !model.is_downloaded() {
+            eprintln!("[2/3] Downloading the Clear model...");
+            model.download()?;
+        } else {
+            eprintln!("[2/3] Model already cached");
+        }
+        eprintln!("[3/3] Enhancing {:.1}s of audio...", channels[0].len() as f64 / sample_rate);
+        let result = model.enhance(
+            &channels,
+            sample_rate,
+            &EnhanceOptions {
+                strength: 1.0,
+                target_lufs: Some(-19.0),
+                peak_ceiling_dbfs: -1.5,
+                max_gain_db: 9.0,
+                output_sample_rate: 48_000.0,
+                mono_downmix: true,
+            },
+        )?;
+        Ok((result, channels[0].len()))
+    })
+    .join()
+    .map_err(|_| "the Clear worker thread panicked".to_string())??;
+    let (result, input_len) = result;
 
     let samples_out = &result.channels[0];
     if samples_out.is_empty() || samples_out.iter().any(|s| !s.is_finite()) {
         return Err("Clear returned empty or non-finite audio".into());
     }
-    let expected = (channels[0].len() as f64 * result.sample_rate / spec.sample_rate as f64) as usize;
+    let expected = (input_len as f64 * result.sample_rate / spec.sample_rate as f64) as usize;
     if samples_out.len().abs_diff(expected) > 480 {
         return Err(format!("unexpected output length {} (expected ~{expected})", samples_out.len()));
     }
