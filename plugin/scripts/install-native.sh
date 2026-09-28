@@ -25,7 +25,7 @@ target="${RTD_NATIVE_DIR:-$data/remove-that-dirt/native/$key}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-echo "Downloading @desert-ant-labs/clear $VERSION…"
+echo "Downloading @desert-ant-labs/clear ${VERSION}..."
 curl -fsSL "https://registry.npmjs.org/@desert-ant-labs/clear/-/clear-$VERSION.tgz" | tar -xz -C "$tmp"
 
 mkdir -p "$target"

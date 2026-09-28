@@ -10,9 +10,11 @@ on:
 permissions:
   contents: read
 
+# Queue rather than cancel: an interrupted run would throw away the long
+# Windows Clear build before it reaches the cache.
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always

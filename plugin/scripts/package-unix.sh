@@ -17,7 +17,9 @@ cargo xtask bundle remove_that_dirt --release
 clap="$PWD/target/bundled/$NAME.clap"
 
 native="$PWD/target/native/$key"
-[ -e "$native/LICENSE.md" ] || RTD_NATIVE_DIR="$native" ./scripts/install-native.sh
+if [ ! -e "$native/LICENSE.md" ]; then
+  RTD_NATIVE_DIR="$native" ./scripts/install-native.sh
+fi
 
 out="$PWD/target/dist/remove-that-dirt-$VERSION-$os"
 rm -rf "$out" && mkdir -p "$out"
