@@ -1,0 +1,4 @@
+node_modules/
+dist/
+web/public/litert/
+.DS_Store

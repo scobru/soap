@@ -1,0 +1,23 @@
+{
+  "name": "clear-voice-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser UI for cleaning up voice recordings with the Desert Ant Labs Clear model, fully on-device.",
+  "scripts": {
+    "copy-litert": "node scripts/copy-litert.mjs",
+    "predev": "npm run copy-litert",
+    "prebuild": "npm run copy-litert",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@desert-ant-labs/clear": "^3.5.0",
+    "@litertjs/core": "^2.5.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  }
+}
