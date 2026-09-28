@@ -174,7 +174,7 @@ jobs:
           cargo build --release --example probe_dlls
           $dir = (Resolve-Path clear-windows-x64).Path
           $env:SOAP_DEBUG_LOAD = "1"
-          foreach ($mode in "direct", "engine", "fallback", "engine-thread", "create") {
+          foreach ($mode in "sym", "sleep-exit", "sleep-sym", "litert-first", "engine") {
             Write-Host "===== $mode ====="
             $p = Start-Process -FilePath target/release/examples/probe_dlls.exe -ArgumentList $mode, $dir -NoNewWindow -PassThru -RedirectStandardError "probe-$mode.log"
             if (-not $p.WaitForExit(45000)) { Write-Host ">>> BLOCKED after 45 s"; Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; Start-Sleep 1 }

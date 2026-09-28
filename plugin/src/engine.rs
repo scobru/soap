@@ -170,7 +170,9 @@ struct ClearLib {
 impl ClearLib {
     fn get() -> Result<&'static ClearLib, String> {
         static LIB: OnceLock<Result<ClearLib, String>> = OnceLock::new();
-        LIB.get_or_init(Self::load).as_ref().map_err(Clone::clone)
+        let lib = LIB.get_or_init(Self::load);
+        trace(|| "library initialised".into());
+        lib.as_ref().map_err(Clone::clone)
     }
 
     fn load() -> Result<ClearLib, String> {
@@ -201,14 +203,24 @@ impl ClearLib {
         }
 
         let create_symbol = format!("{MODEL_ID}_create\0");
+        let symbol = |name: &[u8]| {
+            trace(|| format!("GetProcAddress {}", String::from_utf8_lossy(&name[..name.len() - 1])));
+            core.get::<unsafe extern "C" fn()>(name).map(|f| *f).map_err(err)
+        };
+        let create = symbol(create_symbol.as_bytes())?;
+        let is_downloaded = symbol(b"dal_is_downloaded\0")?;
+        let download = symbol(b"dal_download\0")?;
+        let run = symbol(b"dal_run\0")?;
+        let destroy = symbol(b"dal_destroy\0")?;
+        let buffer_free = symbol(b"dal_buffer_free\0")?;
         trace(|| "Clear core ready".into());
         Ok(ClearLib {
-            create: *core.get::<CreateFn>(create_symbol.as_bytes()).map_err(err)?,
-            is_downloaded: *core.get::<HandleIntFn>(b"dal_is_downloaded\0").map_err(err)?,
-            download: *core.get::<HandleIntFn>(b"dal_download\0").map_err(err)?,
-            run: *core.get::<RunFn>(b"dal_run\0").map_err(err)?,
-            destroy: *core.get::<PtrFn>(b"dal_destroy\0").map_err(err)?,
-            buffer_free: *core.get::<PtrFn>(b"dal_buffer_free\0").map_err(err)?,
+            create: std::mem::transmute::<unsafe extern "C" fn(), CreateFn>(create),
+            is_downloaded: std::mem::transmute::<unsafe extern "C" fn(), HandleIntFn>(is_downloaded),
+            download: std::mem::transmute::<unsafe extern "C" fn(), HandleIntFn>(download),
+            run: std::mem::transmute::<unsafe extern "C" fn(), RunFn>(run),
+            destroy: std::mem::transmute::<unsafe extern "C" fn(), PtrFn>(destroy),
+            buffer_free: std::mem::transmute::<unsafe extern "C" fn(), PtrFn>(buffer_free),
             dir: dir.to_path_buf(),
             _core: core,
         })
