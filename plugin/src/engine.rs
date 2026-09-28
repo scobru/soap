@@ -48,20 +48,49 @@ pub fn default_native_dir() -> Option<PathBuf> {
     dirs::data_local_dir().map(|d| d.join("soap-voice").join("native").join(platform_key()))
 }
 
-/// Release builds ship the Clear core next to the plugin binary: in the
-/// bundle's `Resources/native` on macOS, beside the `.clap` elsewhere.
-fn native_dir_candidates() -> Vec<PathBuf> {
-    let mut dirs = Vec::new();
+/// Print a loading step when `SOAP_DEBUG_LOAD` is set (diagnostics only).
+fn trace(message: impl FnOnce() -> String) {
+    if std::env::var_os("SOAP_DEBUG_LOAD").is_some() {
+        eprintln!("[soap] {}", message());
+    }
+}
+
+/// Where the Clear core may live, tried in order and only as far as needed:
+/// `SOAP_NATIVE_DIR`, then beside the plugin binary (the bundle's
+/// `Resources/native` on macOS, next to the `.clap` elsewhere), then the
+/// per-user folder `install-native.sh` uses.
+fn find_native_dir() -> Result<PathBuf, String> {
+    let mut tried = Vec::new();
+    let mut check = |dir: PathBuf| -> Option<PathBuf> {
+        trace(|| format!("looking in {}", dir.display()));
+        if dir.join(CORE_FILE).is_file() {
+            Some(dir)
+        } else {
+            tried.push(dir.display().to_string());
+            None
+        }
+    };
     if let Some(dir) = std::env::var_os("SOAP_NATIVE_DIR") {
-        dirs.push(PathBuf::from(dir));
+        if let Some(found) = check(PathBuf::from(dir)) {
+            return Ok(found);
+        }
     }
+    trace(|| "locating the plugin binary".into());
     if let Some(dir) = own_module_path().as_deref().and_then(Path::parent) {
-        dirs.push(dir.join("..").join("Resources").join("native"));
-        dirs.push(dir.join("native"));
-        dirs.push(dir.to_path_buf());
+        for candidate in [dir.join("..").join("Resources").join("native"), dir.join("native"), dir.to_path_buf()] {
+            if let Some(found) = check(candidate) {
+                return Ok(found);
+            }
+        }
     }
-    dirs.extend(default_native_dir());
-    dirs
+    trace(|| "locating the user data folder".into());
+    if let Some(found) = default_native_dir().and_then(&mut check) {
+        return Ok(found);
+    }
+    Err(format!(
+        "Clear native library not found (looked in: {}). Reinstall the plugin package.",
+        tried.join(", ")
+    ))
 }
 
 /// Path of the binary this code lives in (the plugin, not the host).
@@ -110,7 +139,9 @@ unsafe fn load_library(path: &Path) -> Result<Library, libloading::Error> {
     // A missing or mismatched dependency would otherwise raise a modal system
     // dialog that blocks the host; report it as an error instead.
     let mut previous = 0;
+    trace(|| "SetThreadErrorMode".into());
     SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX, &mut previous);
+    trace(|| "LoadLibraryExW".into());
     // Resolve the core's own dependencies (LiteRT, ONNX Runtime, the Swift
     // runtime) from its folder first, never from PATH or System32 copies.
     let result =
@@ -150,24 +181,16 @@ impl ClearLib {
                 std::env::consts::ARCH
             ));
         }
-        let candidates = native_dir_candidates();
-        let dir = candidates
-            .iter()
-            .find(|d| d.join(CORE_FILE).is_file())
-            .ok_or_else(|| {
-                let tried: Vec<_> = candidates.iter().map(|d| d.display().to_string()).collect();
-                format!(
-                    "Clear native library not found (looked in: {}). Reinstall the plugin package.",
-                    tried.join(", ")
-                )
-            })?;
-        unsafe { Self::open(dir) }
+        let dir = find_native_dir()?;
+        unsafe { Self::open(&dir) }
     }
 
     unsafe fn open(dir: &Path) -> Result<ClearLib, String> {
         let err = |e: libloading::Error| format!("Could not load the Clear library: {e}");
         // On Linux the core finds libLiteRt.so beside it through its $ORIGIN runpath.
+        trace(|| format!("loading {}", dir.join(CORE_FILE).display()));
         let core = load_library(&dir.join(CORE_FILE)).map_err(err)?;
+        trace(|| "resolving symbols".into());
 
         if cfg!(target_os = "linux") {
             if let Ok(curl) = core.get::<ProbeFn>(b"dal_curl_available\0") {
@@ -178,6 +201,7 @@ impl ClearLib {
         }
 
         let create_symbol = format!("{MODEL_ID}_create\0");
+        trace(|| "Clear core ready".into());
         Ok(ClearLib {
             create: *core.get::<CreateFn>(create_symbol.as_bytes()).map_err(err)?,
             is_downloaded: *core.get::<HandleIntFn>(b"dal_is_downloaded\0").map_err(err)?,

@@ -6,6 +6,7 @@
 //!   engine         soap::engine::preload() on the main thread
 //!   engine-thread  preload() on a spawned thread
 //!   engine-busy    preload() on a spawned thread while another thread sleeps
+//!   fallback       preload() with the plugin-path and user-folder lookups
 //!   create         preload(), then clear_create and dal_is_downloaded
 //! `cargo run --example probe_dlls -- <mode> <folder>`
 
@@ -66,6 +67,11 @@ fn main() {
         "engine-busy" => {
             std::thread::spawn(|| std::thread::sleep(std::time::Duration::from_secs(600)));
             std::thread::spawn(preload).join().unwrap();
+        }
+        "fallback" => {
+            // Skip SOAP_NATIVE_DIR so the plugin-path and user-folder lookups run.
+            std::env::set_var("SOAP_NATIVE_DIR", dir.join("does-not-exist"));
+            preload();
         }
         "create" => {
             preload();
