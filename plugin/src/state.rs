@@ -161,6 +161,6 @@ impl Shared {
 pub fn takes_dir() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("clear-voice")
+        .join("remove-that-dirt")
         .join("takes")
 }

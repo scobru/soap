@@ -2,4 +2,7 @@ node_modules/
 dist/
 target/
 web/public/litert/
+plugin/clear-windows-x64/
+plugin/*.wav
+web/*.wav
 .DS_Store

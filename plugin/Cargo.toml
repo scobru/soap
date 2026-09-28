@@ -1,9 +1,9 @@
 [package]
-name = "clear_voice"
+name = "remove_that_dirt"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.88"
-description = "Offline voice cleanup plugin (CLAP/VST3) powered by the Desert Ant Labs Clear model"
+description = "Offline voice cleanup plugin (CLAP, VST3 and AU via clap-wrapper) powered by the Desert Ant Labs Clear model"
 publish = false
 
 [workspace]
@@ -12,8 +12,17 @@ members = ["xtask"]
 [lib]
 crate-type = ["cdylib", "lib"]
 
+[[bin]]
+name = "remove_that_dirt"
+path = "src/main.rs"
+required-features = ["standalone"]
+
+[features]
+# Standalone app (JACK/ALSA/CoreAudio) for development; plugins don't need it.
+standalone = ["nih_plug/standalone"]
+
 [dependencies]
-nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683", features = ["assert_process_allocs", "standalone"] }
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683", default-features = false, features = ["assert_process_allocs"] }
 nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
 arc-swap = "1"
 dirs = "6"
@@ -22,6 +31,12 @@ libloading = "0.8"
 open = "5"
 rtrb = "0.3"
 serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_System_LibraryLoader"] }
 
 [profile.release]
 lto = "thin"

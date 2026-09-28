@@ -1,5 +1,5 @@
-//! Bindings to the prebuilt Clear native core (`libClearNode`) shipped in the
-//! `@desert-ant-labs/clear` npm package. It exposes the generic `dal_*` C ABI;
+//! Bindings to the Clear native core (`libClearNode` / `ClearNode.dll`) built
+//! from Desert Ant Labs' desert-ant-core. It exposes the generic `dal_*` C ABI;
 //! options and results cross it as big-endian payloads (see the SDK's `codec.js`).
 
 use libloading::Library;
@@ -28,13 +28,10 @@ const MODEL_ID: &str = "clear";
 const CORE_FILE: &str = "libClearNode.so";
 #[cfg(target_os = "macos")]
 const CORE_FILE: &str = "libClearNode.dylib";
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(target_os = "windows")]
 const CORE_FILE: &str = "ClearNode.dll";
-
-#[cfg(target_os = "linux")]
-const RUNTIME_FILE: Option<&str> = Some("libLiteRt.so");
-#[cfg(not(target_os = "linux"))]
-const RUNTIME_FILE: Option<&str> = None;
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+const CORE_FILE: &str = "libClearNode.so";
 
 /// `<platform>-<arch>` as the npm package names its `native/` folders.
 pub fn platform_key() -> &'static str {
@@ -42,21 +39,79 @@ pub fn platform_key() -> &'static str {
         ("linux", "x86_64") => "linux-x64",
         ("linux", "aarch64") => "linux-arm64",
         ("macos", "aarch64") => "darwin-arm64",
+        ("windows", "x86_64") => "windows-x64",
         _ => "unsupported",
     }
 }
 
 pub fn default_native_dir() -> Option<PathBuf> {
-    dirs::data_local_dir().map(|d| d.join("clear-voice").join("native").join(platform_key()))
+    dirs::data_local_dir().map(|d| d.join("remove-that-dirt").join("native").join(platform_key()))
 }
 
+/// Release builds ship the Clear core next to the plugin binary: in the
+/// bundle's `Resources/native` on macOS, beside the `.clap` elsewhere.
 fn native_dir_candidates() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
-    if let Some(dir) = std::env::var_os("CLEAR_VOICE_NATIVE_DIR") {
+    if let Some(dir) = std::env::var_os("RTD_NATIVE_DIR") {
         dirs.push(PathBuf::from(dir));
+    }
+    if let Some(dir) = own_module_path().as_deref().and_then(Path::parent) {
+        dirs.push(dir.join("..").join("Resources").join("native"));
+        dirs.push(dir.join("native"));
+        dirs.push(dir.to_path_buf());
     }
     dirs.extend(default_native_dir());
     dirs
+}
+
+/// Path of the binary this code lives in (the plugin, not the host).
+#[cfg(unix)]
+fn own_module_path() -> Option<PathBuf> {
+    use std::ffi::CStr;
+    use std::os::unix::ffi::OsStrExt;
+    let mut info: libc::Dl_info = unsafe { std::mem::zeroed() };
+    let found = unsafe { libc::dladdr(own_module_path as *const c_void, &mut info) };
+    if found == 0 || info.dli_fname.is_null() {
+        return None;
+    }
+    let name = unsafe { CStr::from_ptr(info.dli_fname) };
+    Some(PathBuf::from(std::ffi::OsStr::from_bytes(name.to_bytes())))
+}
+
+#[cfg(windows)]
+fn own_module_path() -> Option<PathBuf> {
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::Foundation::HMODULE;
+    use windows_sys::Win32::System::LibraryLoader::{
+        GetModuleFileNameW, GetModuleHandleExW, GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+        GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+    };
+    let mut module: HMODULE = std::ptr::null_mut();
+    let flags = GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT;
+    if unsafe { GetModuleHandleExW(flags, own_module_path as *const u16, &mut module) } == 0 {
+        return None;
+    }
+    let mut buf = vec![0u16; 32_768];
+    let len = unsafe { GetModuleFileNameW(module, buf.as_mut_ptr(), buf.len() as u32) } as usize;
+    (len > 0).then(|| PathBuf::from(std::ffi::OsString::from_wide(&buf[..len])))
+}
+
+#[cfg(not(any(unix, windows)))]
+fn own_module_path() -> Option<PathBuf> {
+    None
+}
+
+#[cfg(windows)]
+unsafe fn load_library(path: &Path) -> Result<Library, libloading::Error> {
+    use libloading::os::windows::{Library as WinLibrary, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR};
+    // Resolve the core's own dependencies (LiteRT, ONNX Runtime, the Swift
+    // runtime) from its folder first, never from PATH or System32 copies.
+    WinLibrary::load_with_flags(path, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS).map(Into::into)
+}
+
+#[cfg(not(windows))]
+unsafe fn load_library(path: &Path) -> Result<Library, libloading::Error> {
+    Library::new(path)
 }
 
 struct ClearLib {
@@ -66,9 +121,9 @@ struct ClearLib {
     run: RunFn,
     destroy: PtrFn,
     buffer_free: PtrFn,
+    dir: PathBuf,
     // Held for the lifetime of the process: the Swift core must never be unloaded.
     _core: Library,
-    _runtime: Option<Library>,
 }
 
 impl ClearLib {
@@ -80,7 +135,7 @@ impl ClearLib {
     fn load() -> Result<ClearLib, String> {
         if platform_key() == "unsupported" {
             return Err(format!(
-                "Clear has no native build for {}-{}: supported are Linux x64/arm64 and macOS Apple Silicon.",
+                "Clear has no native build for {}-{}: supported are Windows x64, macOS Apple Silicon and Linux x64/arm64.",
                 std::env::consts::OS,
                 std::env::consts::ARCH
             ));
@@ -92,7 +147,7 @@ impl ClearLib {
             .ok_or_else(|| {
                 let tried: Vec<_> = candidates.iter().map(|d| d.display().to_string()).collect();
                 format!(
-                    "Clear native library not found (looked in: {}). Run scripts/install-native.sh.",
+                    "Clear native library not found (looked in: {}). Reinstall the plugin package.",
                     tried.join(", ")
                 )
             })?;
@@ -101,11 +156,8 @@ impl ClearLib {
 
     unsafe fn open(dir: &Path) -> Result<ClearLib, String> {
         let err = |e: libloading::Error| format!("Could not load the Clear library: {e}");
-        let runtime = match RUNTIME_FILE {
-            Some(file) if dir.join(file).is_file() => Some(Library::new(dir.join(file)).map_err(err)?),
-            _ => None,
-        };
-        let core = Library::new(dir.join(CORE_FILE)).map_err(err)?;
+        // On Linux the core finds libLiteRt.so beside it through its $ORIGIN runpath.
+        let core = load_library(&dir.join(CORE_FILE)).map_err(err)?;
 
         if cfg!(target_os = "linux") {
             if let Ok(curl) = core.get::<ProbeFn>(b"dal_curl_available\0") {
@@ -123,10 +175,16 @@ impl ClearLib {
             run: *core.get::<RunFn>(b"dal_run\0").map_err(err)?,
             destroy: *core.get::<PtrFn>(b"dal_destroy\0").map_err(err)?,
             buffer_free: *core.get::<PtrFn>(b"dal_buffer_free\0").map_err(err)?,
+            dir: dir.to_path_buf(),
             _core: core,
-            _runtime: runtime,
         })
     }
+}
+
+/// Load the Clear core now (it is otherwise loaded on first use) and report
+/// the folder it came from.
+pub fn preload() -> Result<PathBuf, String> {
+    ClearLib::get().map(|lib| lib.dir.clone())
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -6,14 +6,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::state::{takes_dir, Command, Monitor, Phase, Shared};
-use crate::ClearVoiceParams;
+use crate::RtdParams;
 
 const ACCENT: Color32 = Color32::from_rgb(79, 184, 156);
 const ORIGINAL: Color32 = Color32::from_rgb(217, 160, 91);
 const DANGER: Color32 = Color32::from_rgb(242, 135, 127);
 const MUTED: Color32 = Color32::from_rgb(156, 153, 143);
 
-pub fn create(params: Arc<ClearVoiceParams>, shared: Arc<Shared>) -> Option<Box<dyn Editor>> {
+pub fn create(params: Arc<RtdParams>, shared: Arc<Shared>) -> Option<Box<dyn Editor>> {
     create_egui_editor(
         params.editor_state.clone(),
         (),
@@ -33,14 +33,14 @@ pub fn create(params: Arc<ClearVoiceParams>, shared: Arc<Shared>) -> Option<Box<
     )
 }
 
-fn draw(ui: &mut egui::Ui, setter: &ParamSetter, params: &ClearVoiceParams, shared: &Shared) {
+fn draw(ui: &mut egui::Ui, setter: &ParamSetter, params: &RtdParams, shared: &Shared) {
     let status = shared.status();
     let take = params.take.lock().unwrap().clone();
     let busy = matches!(status.phase, Phase::Busy(_));
     let armed = status.phase == Phase::Armed;
 
     ui.horizontal(|ui| {
-        ui.label(RichText::new("Clear Voice").size(20.0).strong());
+        ui.label(RichText::new("Remove That Dirt").size(20.0).strong());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let (color, text) = match &status.phase {
                 Phase::Empty => (MUTED, "Nothing captured".to_string()),

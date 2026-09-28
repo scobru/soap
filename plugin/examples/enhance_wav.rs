@@ -1,7 +1,7 @@
 //! Run Clear on a WAV file outside a DAW, to check the native install:
 //! `cargo run --release --example enhance_wav -- in.wav out.wav`
 
-use clear_voice::engine::{ClearModel, EnhanceOptions};
+use remove_that_dirt::engine::{ClearModel, EnhanceOptions};
 
 fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
@@ -42,6 +42,15 @@ fn main() -> Result<(), String> {
             mono_downmix: true,
         },
     )?;
+
+    let samples_out = &result.channels[0];
+    if samples_out.is_empty() || samples_out.iter().any(|s| !s.is_finite()) {
+        return Err("Clear returned empty or non-finite audio".into());
+    }
+    let expected = (channels[0].len() as f64 * result.sample_rate / spec.sample_rate as f64) as usize;
+    if samples_out.len().abs_diff(expected) > 480 {
+        return Err(format!("unexpected output length {} (expected ~{expected})", samples_out.len()));
+    }
 
     let out_spec = hound::WavSpec {
         channels: result.channels.len() as u16,

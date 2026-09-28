@@ -1,0 +1,192 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Keeps CI runs out of Desert Ant Labs' active-device counts.
+  DAL_USAGE_DISABLED: "1"
+  CLEAR_VERSION: "3.5.0"
+
+jobs:
+  web:
+    name: Web app
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - name: End-to-end with the real model
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          python3 ../plugin/scripts/make-test-wav.py noisy.wav
+          node scripts/e2e.mjs noisy.wav
+      - uses: actions/upload-artifact@v5
+        with:
+          name: web
+          path: web/dist
+
+  linux:
+    name: Plugin (Linux)
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v5
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-xcb-dev libxcursor-dev libgl-dev libxcb-icccm4-dev \
+            libxcb-dri2-0-dev libasound2-dev libjack-jackd2-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: plugin
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - name: Package
+        run: VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-unix.sh
+      - name: Smoke test with the real model
+        run: |
+          python3 scripts/make-test-wav.py noisy.wav
+          RTD_NATIVE_DIR=target/native/linux-x64 cargo run --release --example enhance_wav -- noisy.wav clean.wav
+      - uses: actions/upload-artifact@v5
+        with:
+          name: plugin-linux
+          path: plugin/target/dist/*.zip
+
+  macos:
+    name: Plugin (macOS)
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: plugin
+      - run: cargo test
+      - name: Package
+        run: VERSION="${GITHUB_REF_NAME//\//-}" ./scripts/package-unix.sh
+      - name: Smoke test with the real model
+        run: |
+          python3 scripts/make-test-wav.py noisy.wav
+          RTD_NATIVE_DIR=target/native/darwin-arm64 cargo run --release --example enhance_wav -- noisy.wav clean.wav
+      - name: Validate the Audio Unit
+        run: |
+          pkg=$(find target/dist -maxdepth 1 -type d -name 'remove-that-dirt-*-macos' | head -1)
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "$pkg/Remove That Dirt.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -a | grep -i "Rtdt" || true
+          auval -v aufx Rtdt Scbr
+      - uses: actions/upload-artifact@v5
+        with:
+          name: plugin-macos
+          path: plugin/target/dist/*.zip
+
+  clear-windows:
+    name: Clear core (Windows)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v5
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: plugin/clear-windows-x64
+          key: clear-windows-x64-${{ env.CLEAR_VERSION }}-${{ hashFiles('plugin/scripts/build-clear-windows.ps1') }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: compnerd/gha-setup-swift@v0.4.0
+        with:
+          branch: swift-6.2.1-release
+          tag: 6.2.1-RELEASE
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: ilammy/msvc-dev-cmd@v1
+      - if: steps.cache.outputs.cache-hit != 'true'
+        name: Build ClearNode.dll
+        shell: pwsh
+        run: ./scripts/build-clear-windows.ps1 -Version $env:CLEAR_VERSION -OutDir clear-windows-x64
+      - uses: actions/upload-artifact@v5
+        with:
+          name: clear-windows-x64
+          path: plugin/clear-windows-x64
+
+  windows:
+    name: Plugin (Windows)
+    needs: clear-windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: clear-windows-x64
+          path: plugin/clear-windows-x64
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: plugin
+      - run: cargo test
+      - name: Package
+        shell: pwsh
+        run: ./scripts/package-windows.ps1 -Version ($env:GITHUB_REF_NAME -replace '/', '-') -ClearDir clear-windows-x64
+      - name: Smoke test with the real model
+        shell: pwsh
+        run: |
+          python scripts/make-test-wav.py noisy.wav
+          $env:RTD_NATIVE_DIR = (Resolve-Path clear-windows-x64).Path
+          cargo run --release --example enhance_wav -- noisy.wav clean.wav
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v5
+        with:
+          name: plugin-windows
+          path: plugin/target/dist/*.zip
+
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [web, linux, macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: plugin-*
+          merge-multiple: true
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true

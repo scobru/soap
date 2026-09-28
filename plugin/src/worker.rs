@@ -11,7 +11,7 @@ use crate::engine::ClearModel;
 use crate::state::{
     takes_dir, BlockHeader, CleanTake, Command, Phase, RenderStats, Shared, TakeMeta,
 };
-use crate::ClearVoiceParams;
+use crate::RtdParams;
 
 /// Longest capture kept in memory (one hour).
 const MAX_CAPTURE_SEC: f64 = 3600.0;
@@ -32,7 +32,7 @@ struct Io {
 
 pub struct Worker {
     shared: Arc<Shared>,
-    params: Arc<ClearVoiceParams>,
+    params: Arc<RtdParams>,
     io: Option<Io>,
     capture: Option<Capture>,
     model: Option<ClearModel>,
@@ -41,17 +41,18 @@ pub struct Worker {
     /// Between Arm and the end of that capture, so a late end-of-pass marker
     /// from the audio thread cannot finish the same capture twice.
     session: bool,
+    preloaded: bool,
 }
 
 impl Worker {
-    pub fn spawn(shared: Arc<Shared>, params: Arc<ClearVoiceParams>, rx: Receiver<Command>) -> std::thread::JoinHandle<()> {
+    pub fn spawn(shared: Arc<Shared>, params: Arc<RtdParams>, rx: Receiver<Command>) -> std::thread::JoinHandle<()> {
         std::thread::Builder::new()
-            .name("clear-voice-worker".into())
+            .name("rtd-worker".into())
             .spawn(move || {
-                let mut worker = Worker { shared, params, io: None, capture: None, model: None, loaded: None, session: false };
+                let mut worker = Worker { shared, params, io: None, capture: None, model: None, loaded: None, session: false, preloaded: false };
                 worker.run(rx);
             })
-            .expect("failed to spawn the Clear Voice worker thread")
+            .expect("failed to spawn the RTD worker thread")
     }
 
     fn run(&mut self, rx: Receiver<Command>) {
@@ -78,6 +79,13 @@ impl Worker {
                 self.session = false;
                 self.shared.armed.store(false, Ordering::Release);
                 self.sync_capture_flag();
+                if !self.preloaded {
+                    self.preloaded = true;
+                    match crate::engine::preload() {
+                        Ok(dir) => nih_plug::nih_log!("RTD: Clear core loaded from {}", dir.display()),
+                        Err(e) => self.fail(e),
+                    }
+                }
             }
             Command::Restore(meta) => self.restore(meta),
             Command::Arm => {
@@ -294,7 +302,7 @@ impl Worker {
     }
 
     fn fail(&self, message: String) {
-        nih_plug::nih_log!("Clear Voice: {message}");
+        nih_plug::nih_log!("RTD: {message}");
         self.shared.set_phase(Phase::Error(message));
     }
 }
@@ -401,7 +409,7 @@ mod tests {
 
     #[test]
     fn wav_round_trip() {
-        let path = std::env::temp_dir().join(format!("clear-voice-test-{}.wav", new_take_id()));
+        let path = std::env::temp_dir().join(format!("rtd-test-{}.wav", new_take_id()));
         write_wav(&path, &[vec![0.5, -0.5], vec![0.25, 0.0]], 44_100.0).unwrap();
         let (channels, rate) = read_wav(&path).unwrap();
         std::fs::remove_file(&path).unwrap();

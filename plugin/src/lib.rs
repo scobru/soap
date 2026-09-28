@@ -13,8 +13,8 @@ use state::{BlockHeader, CleanTake, Command, Loudness, Monitor, Phase, RenderSet
 /// Seconds of audio the capture ring holds between worker drains.
 const RING_SECONDS: f32 = 4.0;
 
-pub struct ClearVoice {
-    params: Arc<ClearVoiceParams>,
+pub struct RemoveThatDirt {
+    params: Arc<RtdParams>,
     shared: Arc<Shared>,
     worker_rx: Option<mpsc::Receiver<Command>>,
     worker: Option<std::thread::JoinHandle<()>>,
@@ -29,7 +29,7 @@ pub struct ClearVoice {
 }
 
 #[derive(Params)]
-pub struct ClearVoiceParams {
+pub struct RtdParams {
     #[persist = "editor-state"]
     editor_state: Arc<EguiState>,
 
@@ -58,7 +58,7 @@ pub struct ClearVoiceParams {
     pub auto_process: BoolParam,
 }
 
-impl Default for ClearVoiceParams {
+impl Default for RtdParams {
     fn default() -> Self {
         Self {
             editor_state: EguiState::from_size(520, 600),
@@ -81,7 +81,7 @@ impl Default for ClearVoiceParams {
     }
 }
 
-impl ClearVoiceParams {
+impl RtdParams {
     pub fn render_settings(&self) -> RenderSettings {
         RenderSettings {
             strength: self.strength.value(),
@@ -93,11 +93,11 @@ impl ClearVoiceParams {
     }
 }
 
-impl Default for ClearVoice {
+impl Default for RemoveThatDirt {
     fn default() -> Self {
         let (tx, rx) = mpsc::channel();
         Self {
-            params: Arc::new(ClearVoiceParams::default()),
+            params: Arc::new(RtdParams::default()),
             shared: Arc::new(Shared {
                 armed: Default::default(),
                 overflow: Default::default(),
@@ -118,10 +118,10 @@ impl Default for ClearVoice {
     }
 }
 
-impl Plugin for ClearVoice {
-    const NAME: &'static str = "Clear Voice";
-    const VENDOR: &'static str = "Clear Voice";
-    const URL: &'static str = "https://desertant.com/models/clear/";
+impl Plugin for RemoveThatDirt {
+    const NAME: &'static str = "Remove That Dirt";
+    const VENDOR: &'static str = "scobru";
+    const URL: &'static str = "https://github.com/scobru/remove-that-dirt";
     const EMAIL: &'static str = "";
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -242,7 +242,7 @@ impl Plugin for ClearVoice {
     }
 }
 
-impl ClearVoice {
+impl RemoveThatDirt {
     fn capture_block(&mut self, buffer: &Buffer, pos: i64) {
         let (Some(headers), Some(data)) = (&mut self.headers, &mut self.data) else { return };
         let frames = buffer.samples();
@@ -274,7 +274,7 @@ fn play_take(outputs: &mut [&mut [f32]], take: &CleanTake, pos: i64) {
     }
 }
 
-impl Drop for ClearVoice {
+impl Drop for RemoveThatDirt {
     fn drop(&mut self) {
         self.shared.send(Command::Quit);
         if let Some(worker) = self.worker.take() {
@@ -283,8 +283,8 @@ impl Drop for ClearVoice {
     }
 }
 
-impl ClapPlugin for ClearVoice {
-    const CLAP_ID: &'static str = "com.clear-voice.clear-voice";
+impl ClapPlugin for RemoveThatDirt {
+    const CLAP_ID: &'static str = "com.scobru.remove-that-dirt";
     const CLAP_DESCRIPTION: Option<&'static str> =
         Some("Offline voice cleanup (denoise, dereverb, loudness) with the Desert Ant Labs Clear model");
     const CLAP_MANUAL_URL: Option<&'static str> = None;
@@ -297,13 +297,7 @@ impl ClapPlugin for ClearVoice {
     ];
 }
 
-impl Vst3Plugin for ClearVoice {
-    const VST3_CLASS_ID: [u8; 16] = *b"ClearVoiceDALv01";
-    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[Vst3SubCategory::Fx, Vst3SubCategory::Restoration];
-}
-
-nih_export_clap!(ClearVoice);
-nih_export_vst3!(ClearVoice);
+nih_export_clap!(RemoveThatDirt);
 
 #[cfg(test)]
 mod tests {

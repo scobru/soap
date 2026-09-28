@@ -1,6 +1,6 @@
-use clear_voice::ClearVoice;
+use remove_that_dirt::RemoveThatDirt;
 use nih_plug::prelude::*;
 
 fn main() {
-    nih_export_standalone::<ClearVoice>();
+    nih_export_standalone::<RemoveThatDirt>();
 }
