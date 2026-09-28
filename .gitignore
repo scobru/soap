@@ -6,3 +6,4 @@ plugin/clear-windows-x64/
 plugin/*.wav
 web/*.wav
 .DS_Store
+.vercel/
