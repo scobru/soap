@@ -122,7 +122,7 @@ jobs:
           "$app/Contents/MacOS/Soap" --clean noisy.wav clean-app.wav
       - name: Validate the Audio Unit
         run: |
-          pkg=$(find target/dist -maxdepth 1 -type d -name 'soap-*-macos' | head -1)
+          pkg=$(find target/dist -maxdepth 1 -type d -name 'soap-*-macos' ! -name 'soap-app-*' | head -1)
           mkdir -p ~/Library/Audio/Plug-Ins/Components
           cp -R "$pkg/Soap.component" ~/Library/Audio/Plug-Ins/Components/
           killall -9 AudioComponentRegistrar || true
