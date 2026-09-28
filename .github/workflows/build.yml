@@ -166,11 +166,19 @@ jobs:
       - name: Package
         shell: pwsh
         run: ./scripts/package-windows.ps1 -Version ($env:GITHUB_REF_NAME -replace '/', '-') -ClearDir clear-windows-x64
+      - name: Probe the Clear DLLs
+        timeout-minutes: 8
+        shell: pwsh
+        run: |
+          Get-ChildItem clear-windows-x64 | Format-Table Name, Length
+          cargo build --release --example probe_dlls
+          $p = Start-Process -FilePath target/release/examples/probe_dlls.exe -ArgumentList (Resolve-Path clear-windows-x64).Path -NoNewWindow -PassThru -RedirectStandardError probe.log
+          if (-not $p.WaitForExit(120000)) { Write-Host "probe still blocked after 2 minutes"; Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+          Get-Content probe.log
       - name: Smoke test with the real model
         timeout-minutes: 15
         shell: pwsh
         run: |
-          Get-ChildItem clear-windows-x64 | Format-Table Name, Length
           python scripts/make-test-wav.py noisy.wav
           $env:SOAP_NATIVE_DIR = (Resolve-Path clear-windows-x64).Path
           cargo run --release --example enhance_wav -- noisy.wav clean.wav
