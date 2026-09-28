@@ -4,9 +4,9 @@ use std::sync::atomic::Ordering;
 use std::sync::{mpsc, Arc, Mutex};
 
 mod editor;
-mod theme;
 pub mod engine;
-mod state;
+pub mod state;
+pub mod theme;
 mod worker;
 
 use state::{BlockHeader, CleanTake, Command, Loudness, Monitor, Phase, RenderSettings, Shared, Status, TakeMeta};

@@ -71,13 +71,13 @@ pub fn install(ctx: &egui::Context) {
     ctx.set_style(style);
 }
 
-fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
+pub fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
     let t = t.clamp(0.0, 1.0);
     let mix = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
     Color32::from_rgba_unmultiplied(mix(a.r(), b.r()), mix(a.g(), b.g()), mix(a.b(), b.b()), mix(a.a(), b.a()))
 }
 
-fn with_alpha(c: Color32, alpha: u8) -> Color32 {
+pub fn with_alpha(c: Color32, alpha: u8) -> Color32 {
     Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), alpha)
 }
 
@@ -234,37 +234,19 @@ pub fn ghost_button(ui: &mut Ui, text: &str, enabled: bool) -> Response {
     ui.add_enabled(enabled, button)
 }
 
-/// A soap-bar slider: rounded track, aqua fill, a bubble for the knob.
-/// Drag to change, double-click to reset.
-pub fn soap_slider<P: Param>(ui: &mut Ui, setter: &ParamSetter, param: &P, width: f32) -> Response {
+/// A soap-bar slider over a normalized (0..1) value: rounded track, aqua
+/// fill, a bubble for the knob. Returns the new value while it is dragged or
+/// clicked; double-click is left to the caller (reset).
+pub fn slider(ui: &mut Ui, normalized: f32, width: f32) -> (Response, Option<f32>) {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(width, 26.0), Sense::click_and_drag());
     let track = Rect::from_center_size(rect.center(), egui::vec2(width - 24.0, 10.0));
-    let to_normalized = |x: f32| ((x - track.left()) / track.width()).clamp(0.0, 1.0);
-
-    if response.double_clicked() {
-        setter.begin_set_parameter(param);
-        setter.set_parameter(param, param.default_plain_value());
-        setter.end_set_parameter(param);
-    } else if response.drag_started() {
-        setter.begin_set_parameter(param);
-    }
-    if response.dragged() {
-        if let Some(pos) = response.interact_pointer_pos() {
-            setter.set_parameter_normalized(param, to_normalized(pos.x));
-        }
-    } else if response.clicked() {
-        if let Some(pos) = response.interact_pointer_pos() {
-            setter.begin_set_parameter(param);
-            setter.set_parameter_normalized(param, to_normalized(pos.x));
-            setter.end_set_parameter(param);
-        }
-    }
-    if response.drag_stopped() {
-        setter.end_set_parameter(param);
-    }
+    let changed = (response.dragged() || (response.clicked() && !response.double_clicked()))
+        .then(|| response.interact_pointer_pos())
+        .flatten()
+        .map(|pos| ((pos.x - track.left()) / track.width()).clamp(0.0, 1.0));
+    let value = changed.unwrap_or(normalized).clamp(0.0, 1.0);
 
     let painter = ui.painter();
-    let value = param.unmodulated_normalized_value();
     painter.rect_filled(track, 5.0, TRACK);
     let mut filled = track;
     filled.set_width(track.width() * value);
@@ -278,14 +260,34 @@ pub fn soap_slider<P: Param>(ui: &mut Ui, setter: &ParamSetter, param: &P, width
     painter.circle_stroke(knob, r * 0.8, Stroke::new(2.0_f32, with_alpha(PINK, 70)));
     painter.circle_stroke(knob, r, Stroke::new(1.5_f32, AQUA));
     painter.circle_filled(knob + Vec2::new(-r * 0.35, -r * 0.35), r * 0.22, with_alpha(LAVENDER, 90));
-    response.on_hover_cursor(egui::CursorIcon::ResizeHorizontal)
+    (response.on_hover_cursor(egui::CursorIcon::ResizeHorizontal), changed)
 }
 
-/// Pills for each choice of an enum parameter.
-pub fn segmented<T: Enum + PartialEq + Copy + Send + Sync + 'static>(ui: &mut Ui, setter: &ParamSetter, param: &EnumParam<T>, choices: &[(T, &str)]) {
+/// [`slider`] bound to a plugin parameter, with host automation gestures.
+/// Double-click resets it.
+pub fn soap_slider<P: Param>(ui: &mut Ui, setter: &ParamSetter, param: &P, width: f32) -> Response {
+    let (response, changed) = slider(ui, param.unmodulated_normalized_value(), width);
+    if response.double_clicked() {
+        setter.begin_set_parameter(param);
+        setter.set_parameter(param, param.default_plain_value());
+        setter.end_set_parameter(param);
+    } else if response.drag_started() || (response.clicked() && changed.is_some()) {
+        setter.begin_set_parameter(param);
+    }
+    if let Some(value) = changed {
+        setter.set_parameter_normalized(param, value);
+    }
+    if response.drag_stopped() || (response.clicked() && changed.is_some()) {
+        setter.end_set_parameter(param);
+    }
+    response
+}
+
+/// Pills for a set of choices; returns the one clicked, if it changed.
+pub fn choice<T: PartialEq + Copy>(ui: &mut Ui, current: T, choices: &[(T, &str)]) -> Option<T> {
+    let mut picked = None;
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
-        let current = param.value();
         for &(value, label) in choices {
             let selected = current == value;
             let text = RichText::new(label).color(if selected { Color32::WHITE } else { INK });
@@ -294,30 +296,44 @@ pub fn segmented<T: Enum + PartialEq + Copy + Send + Sync + 'static>(ui: &mut Ui
                 .stroke(Stroke::NONE)
                 .corner_radius(14.0);
             if ui.add(button).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() && !selected {
-                setter.begin_set_parameter(param);
-                setter.set_parameter(param, value);
-                setter.end_set_parameter(param);
+                picked = Some(value);
             }
         }
     });
+    picked
 }
 
-/// A switch whose knob is a little bubble.
-pub fn toggle(ui: &mut Ui, setter: &ParamSetter, param: &nih_plug::prelude::BoolParam) -> Response {
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(46.0, 26.0), Sense::click());
-    let on = param.value();
-    if response.clicked() {
+/// [`choice`] over an enum parameter.
+pub fn segmented<T: Enum + PartialEq + Copy + Send + Sync + 'static>(ui: &mut Ui, setter: &ParamSetter, param: &EnumParam<T>, choices: &[(T, &str)]) {
+    if let Some(value) = choice(ui, param.value(), choices) {
         setter.begin_set_parameter(param);
-        setter.set_parameter(param, !on);
+        setter.set_parameter(param, value);
         setter.end_set_parameter(param);
     }
-    let t = ui.ctx().animate_bool(response.id, on);
+}
+
+/// A switch whose knob is a little bubble; flip the value when it's clicked.
+pub fn switch(ui: &mut Ui, on: bool) -> Response {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(46.0, 26.0), Sense::click());
+    let t = ui.ctx().animate_bool(response.id, on != response.clicked());
     let painter = ui.painter();
     painter.rect_filled(rect, 13.0, lerp_color(TRACK, AQUA, t));
     let knob = Pos2::new(egui::lerp(rect.left() + 13.0..=rect.right() - 13.0, t), rect.center().y);
     painter.circle_filled(knob, 10.0, Color32::WHITE);
     painter.circle_stroke(knob, 8.0, Stroke::new(1.5_f32, with_alpha(PINK, 80)));
     response.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
+/// [`switch`] bound to a boolean parameter.
+pub fn toggle(ui: &mut Ui, setter: &ParamSetter, param: &nih_plug::prelude::BoolParam) -> Response {
+    let on = param.value();
+    let response = switch(ui, on);
+    if response.clicked() {
+        setter.begin_set_parameter(param);
+        setter.set_parameter(param, !on);
+        setter.end_set_parameter(param);
+    }
+    response
 }
 
 /// A small rounded tile for one statistic.
