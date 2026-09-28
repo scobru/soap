@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Pulizia delle voci nel browser con il modello Clear: denoise, dereverb e normalizzazione loudness, tutto in locale." />
+    <title>Remove That Dirt</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <h1>Remove That Dirt</h1>
+        <p class="sub">Denoise, dereverb e loudness per registrazioni vocali. L'audio non lascia mai il tuo dispositivo.</p>
+      </div>
+      <div class="model-status" id="model-status" data-state="idle">
+        <span class="dot"></span><span id="model-status-text">Modello non caricato</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel input-panel">
+        <h2>1 · Sorgente</h2>
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept="audio/*,video/*" hidden />
+          <strong>Trascina qui un file audio</strong>
+          <span>oppure clicca per sceglierlo (WAV, MP3, M4A, OGG, FLAC, video…)</span>
+        </label>
+        <div class="row">
+          <button id="record" class="secondary" type="button">● Registra dal microfono</button>
+          <span id="record-time" class="muted"></span>
+        </div>
+        <p id="source-info" class="muted"></p>
+      </section>
+
+      <section class="panel settings-panel">
+        <h2>2 · Impostazioni</h2>
+        <div class="field">
+          <label for="strength">Intensità <output id="strength-out">100%</output></label>
+          <input type="range" id="strength" min="0" max="100" value="100" />
+          <small>Miscela tra originale e voce pulita. Abbassala se il risultato suona troppo processato.</small>
+        </div>
+        <div class="field">
+          <label for="loudness">Loudness di destinazione</label>
+          <select id="loudness">
+            <option value="applePodcasts">Apple Podcasts · −19 LUFS</option>
+            <option value="spotify">Spotify / YouTube · −14 LUFS</option>
+            <option value="broadcast">Broadcast EBU R128 · −23 LUFS</option>
+            <option value="custom">Personalizzata…</option>
+            <option value="off">Nessuna (livello del modello)</option>
+          </select>
+          <input type="number" id="custom-lufs" value="-16" step="0.5" min="-40" max="-6" hidden aria-label="LUFS personalizzati" />
+        </div>
+        <div class="field two">
+          <div>
+            <label for="ceiling">True peak max (dBTP)</label>
+            <input type="number" id="ceiling" value="-1.5" step="0.1" max="0" min="-12" />
+          </div>
+          <div>
+            <label for="max-gain">Guadagno max (dB)</label>
+            <input type="number" id="max-gain" value="9" step="1" min="0" max="30" />
+          </div>
+        </div>
+        <div class="field two">
+          <div>
+            <label for="channels">Canali</label>
+            <select id="channels">
+              <option value="mono">Mono</option>
+              <option value="preserve">Mantieni stereo</option>
+            </select>
+            <small>Lo stereo richiede un passaggio per canale (~1,8×).</small>
+          </div>
+          <div>
+            <label for="rate">Sample rate uscita</label>
+            <select id="rate">
+              <option value="48000">48 kHz</option>
+              <option value="44100">44,1 kHz</option>
+            </select>
+          </div>
+        </div>
+        <div class="field two">
+          <div>
+            <label for="accelerator">Accelerazione</label>
+            <select id="accelerator">
+              <option value="wasm">CPU (WebAssembly)</option>
+              <option value="webgpu">GPU (WebGPU)</option>
+            </select>
+          </div>
+          <div>
+            <label for="format">Formato WAV</label>
+            <select id="format">
+              <option value="pcm16">16-bit PCM</option>
+              <option value="float32">32-bit float</option>
+            </select>
+          </div>
+        </div>
+        <button id="process" class="primary" type="button" disabled>Pulisci la voce</button>
+        <div class="progress" id="progress" hidden><div class="bar" id="progress-bar"></div></div>
+        <p id="error" class="error" role="alert" hidden></p>
+      </section>
+
+      <section class="panel compare-panel">
+        <h2>3 · Confronto</h2>
+        <div class="track">
+          <div class="track-head"><span class="tag orig">Originale</span></div>
+          <canvas id="wave-orig" class="wave"></canvas>
+        </div>
+        <div class="track">
+          <div class="track-head"><span class="tag clean">Pulito</span></div>
+          <canvas id="wave-clean" class="wave"></canvas>
+        </div>
+        <div class="transport">
+          <button id="play" class="secondary" type="button" disabled>▶ Play</button>
+          <div class="ab" role="radiogroup" aria-label="Ascolta">
+            <button id="ab-orig" type="button" role="radio" aria-checked="false">A · Originale</button>
+            <button id="ab-clean" type="button" role="radio" aria-checked="true">B · Pulito</button>
+          </div>
+          <span id="clock" class="muted">0:00 / 0:00</span>
+          <a id="download" class="primary link" hidden>Scarica WAV</a>
+        </div>
+        <dl class="stats" id="stats" hidden>
+          <div><dt>Loudness in ingresso</dt><dd id="stat-lufs">–</dd></div>
+          <div><dt>True peak in uscita</dt><dd id="stat-peak">–</dd></div>
+          <div><dt>Durata</dt><dd id="stat-dur">–</dd></div>
+          <div><dt>Velocità</dt><dd id="stat-rtf">–</dd></div>
+        </dl>
+        <p class="hint muted"><kbd>Spazio</kbd> play/pausa, <kbd>A</kbd>/<kbd>B</kbd> per passare tra originale e pulito senza perdere la posizione.</p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      Voice enhancement by <a href="https://desertant.com/models/clear/" target="_blank" rel="noopener">Clear</a> from
+      Desert Ant Labs (fine-tuned DeepFilterNet 3), under the
+      <a href="https://license.desertant.com/1.0" target="_blank" rel="noopener">Desert Ant Labs Source-Available License</a>.
+      I pesi vengono scaricati da Hugging Face al primo uso e poi restano in cache; l'SDK invia a Desert Ant Labs un conteggio dei dispositivi attivi (mai l'audio).
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
