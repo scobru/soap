@@ -1,0 +1,28 @@
+[package]
+name = "clear_voice"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "Offline voice cleanup plugin (CLAP/VST3) powered by the Desert Ant Labs Clear model"
+publish = false
+
+[workspace]
+members = ["xtask"]
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683", features = ["assert_process_allocs", "standalone"] }
+nih_plug_egui = { git = "https://github.com/robbert-vdh/nih-plug.git", rev = "de421011f41a6d10fc8c7a6084e4f4dee0143683" }
+arc-swap = "1"
+dirs = "6"
+hound = "3.5"
+libloading = "0.8"
+open = "5"
+rtrb = "0.3"
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
