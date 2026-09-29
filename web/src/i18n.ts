@@ -14,6 +14,7 @@ export interface Translations {
   sectionSource: string;
   dropTitle: string;
   dropSubtitle: string;
+  themeToggle: string;
   recordMic: string;
   recordStop: string;
   recordPrefix: string;
@@ -78,6 +79,7 @@ export const dict: Record<Language, Translations> = {
     sectionSource: "1 · Sorgente",
     dropTitle: "Trascina qui un file audio",
     dropSubtitle: "oppure clicca per sceglierlo (WAV, MP3, M4A, OGG, FLAC, video…)",
+    themeToggle: "Tema chiaro o scuro",
     recordMic: "● Registra dal microfono",
     recordStop: "■ Stop",
     recordPrefix: "registrazione",
@@ -140,6 +142,7 @@ export const dict: Record<Language, Translations> = {
     sectionSource: "1 · Source",
     dropTitle: "Drop an audio file here",
     dropSubtitle: "or click to select (WAV, MP3, M4A, OGG, FLAC, video…)",
+    themeToggle: "Light or dark theme",
     recordMic: "● Record from microphone",
     recordStop: "■ Stop",
     recordPrefix: "recording",
@@ -239,6 +242,15 @@ export function applyLanguage(lang: Language) {
     const val = dict[lang][key];
     if (typeof val === "string") {
       el.textContent = val;
+    }
+  });
+
+  // Tooltips and accessible names marked with data-i18n-title
+  document.querySelectorAll<HTMLElement>("[data-i18n-title]").forEach((el) => {
+    const val = dict[lang][el.dataset.i18nTitle as keyof Translations];
+    if (typeof val === "string") {
+      el.title = val;
+      el.setAttribute("aria-label", val);
     }
   });
 
