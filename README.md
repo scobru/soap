@@ -21,6 +21,10 @@ DeepFilterNet 3 that runs entirely on-device. It comes in three forms:
 | Runtime | Native Clear core: LiteRT on Windows/Linux, Core ML on macOS | Same native core as the plugin | WebAssembly + LiteRT.js (CPU) or WebGPU |
 | Workflow | Capture a track region, clean it, play back on the timeline | Open a file, clean it, compare A/B, save WAV | Load or record a file, clean it, compare, export WAV |
 
+> Looking for subtitles, transcripts or cutting the pauses out of a video?
+> That's [Onda](https://github.com/scobru/onda), Soap's sibling built on the
+> same Desert Ant Labs models ([try it](https://onda-mauve-gamma.vercel.app)).
+
 Clear processes whole takes, not a real-time stream: loudness normalization
 measures the integrated LUFS of the whole take, and even its streaming mode
 works in 2-second windows. So the plugin works "offline", Melodyne style.
