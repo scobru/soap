@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Pulizia delle voci nel browser con il modello Clear: denoise, dereverb e normalizzazione loudness, tutto in locale." />
+    <meta name="description" content="Onda: pulisci, trascrivi e sottotitola la voce nel browser con i modelli Clear e Voz, tutto in locale." />
     <meta name="theme-color" content="#f1fbf8" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0f2429" media="(prefers-color-scheme: dark)" />
-    <title>Soap: pulizia della voce</title>
+    <title>Onda: voce, testo e sottotitoli</title>
     <link rel="icon" href="favicon.ico" sizes="32x32" />
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -16,15 +16,15 @@
     <div class="bubbles" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
     <header class="top">
       <div class="brand">
-        <img src="logo.svg" alt="Soap logo" width="64" height="64" />
+        <img src="onda-logo.svg" alt="Onda logo" width="64" height="64" />
         <div>
           <div class="brand-title-row">
-            <h1>Soap</h1>
+            <h1>Onda</h1>
             <a href="https://scobrudot.dev" target="_blank" rel="noopener" class="dev-badge" title="Francesco Bruno (scobru)">
               by <span>scobru</span>
             </a>
           </div>
-          <p class="sub" data-i18n="brandSubtitle">Denoise, dereverb e loudness per registrazioni vocali. L'audio non lascia mai il tuo dispositivo.</p>
+          <p class="sub" data-i18n="brandSubtitle">Pulisci, trascrivi e sottotitola la voce. L'audio non lascia mai il tuo dispositivo.</p>
         </div>
       </div>
       <div class="top-actions">
@@ -60,7 +60,7 @@
       </section>
 
       <section class="panel settings-panel">
-        <h2 data-i18n="sectionSettings">2 · Impostazioni</h2>
+        <h2 class="tool-title"><img src="soap-logo.svg" alt="" width="30" height="30" /><span data-i18n="sectionSettings">2 · Pulisci con Soap</span></h2>
         <div class="field">
           <label for="strength"><span data-i18n="labelStrength">Intensità</span> <output id="strength-out">100%</output></label>
           <input type="range" id="strength" min="0" max="100" value="100" />
@@ -152,12 +152,35 @@
         </dl>
         <p class="hint muted" data-i18n-html="keyboardHint"><kbd>Spazio</kbd> play/pausa, <kbd>A</kbd>/<kbd>B</kbd> per passare tra originale e pulito senza perdere la posizione.</p>
       </section>
+
+      <section class="panel transcript-panel">
+        <h2 class="tool-title"><img src="onda-logo.svg" alt="" width="30" height="30" /><span data-i18n="sectionTranscript">4 · Trascrizione e sottotitoli</span></h2>
+        <div class="row tx-controls">
+          <label for="tx-source" data-i18n="txSourceLabel">Audio da trascrivere</label>
+          <select id="tx-source">
+            <option value="clean" data-i18n="txSourceClean">Versione pulita</option>
+            <option value="orig" data-i18n="txSourceOrig">Originale</option>
+          </select>
+          <button id="transcribe" class="primary" type="button" disabled data-i18n="txButton">Trascrivi</button>
+        </div>
+        <small class="muted" data-i18n="txHelp">Voz riconosce 25 lingue, tra cui italiano e inglese. Al primo uso scarica il modello (circa 390 MB), poi resta in cache.</small>
+        <div class="progress" id="tx-progress" hidden><div class="bar" id="tx-progress-bar"></div></div>
+        <p id="tx-status" class="muted" hidden></p>
+        <p id="tx-error" class="error" role="alert" hidden></p>
+        <div id="transcript" class="transcript" hidden></div>
+        <div class="row tx-exports" id="tx-exports" hidden>
+          <a id="dl-srt" class="primary link" data-i18n="dlSrt">Sottotitoli SRT</a>
+          <a id="dl-vtt" class="secondary link" data-i18n="dlVtt">WebVTT</a>
+          <a id="dl-txt" class="secondary link" data-i18n="dlTxt">Testo</a>
+          <span id="tx-stats" class="muted"></span>
+        </div>
+      </section>
     </main>
 
     <footer class="foot">
       <div class="foot-main">
         <div class="foot-dev" data-i18n-html="footDev">
-          <strong>Soap</strong> · Sviluppato da <a href="https://scobrudot.dev" target="_blank" rel="noopener"><strong>scobru</strong> (Francesco Bruno)</a>
+          <strong>Onda</strong> · Sviluppato da <a href="https://scobrudot.dev" target="_blank" rel="noopener"><strong>scobru</strong> (Francesco Bruno)</a>
         </div>
         <div class="foot-links">
           <a href="https://github.com/scobru/soap" target="_blank" rel="noopener" class="foot-link" title="Codice sorgente su GitHub">
@@ -172,10 +195,10 @@
         </div>
       </div>
       <div class="foot-credits" data-i18n-html="footCredits">
-        Voice enhancement powered by <a href="https://desertant.com/models/clear/" target="_blank" rel="noopener">Clear</a> from
-        Desert Ant Labs (fine-tuned DeepFilterNet 3), under the
+        Voice enhancement by <a href="https://desertant.com/models/clear/" target="_blank" rel="noopener">Clear</a> and speech recognition by
+        <a href="https://desertant.com/models/voz/" target="_blank" rel="noopener">Voz</a> from Desert Ant Labs, under the
         <a href="https://license.desertant.com/1.0" target="_blank" rel="noopener">Desert Ant Labs Source-Available License</a>.
-        I pesi vengono scaricati da Hugging Face al primo uso e poi restano in cache; l'audio non lascia mai il tuo dispositivo.
+        I modelli vengono scaricati da Hugging Face al primo uso e poi restano in cache; l'audio non lascia mai il tuo dispositivo.
       </div>
     </footer>
 

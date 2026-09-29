@@ -1,18 +1,27 @@
-<p align="center"><img src="assets/logo.svg" width="128" alt="Soap logo"></p>
+<p align="center"><img src="assets/onda-logo.svg" width="128" alt="Onda logo"></p>
 
-<h1 align="center">Soap</h1>
+<h1 align="center">Onda</h1>
 
-<p align="center"><b>Voice cleaner</b>: denoise, dereverb and loudness, entirely on your device.</p>
+<p align="center"><b>Voice, text and subtitles</b>: clean up, transcribe and subtitle recordings, entirely on your device.</p>
 
 <p align="center">
-  <img src="assets/screenshot-plugin.png" width="300" alt="The Soap plugin">
-  <img src="assets/screenshot-app.png" width="300" alt="The Soap desktop app">
-  <img src="assets/screenshot-web.png" width="400" alt="The Soap web app">
+  <img src="assets/screenshot-web.png" width="420" alt="The Onda web app">
+  <img src="assets/screenshot-plugin.png" width="260" alt="The Soap plugin">
+  <img src="assets/screenshot-app.png" width="260" alt="The Soap desktop app">
 </p>
 
-Voice cleanup (denoise, dereverb, loudness normalization) built on
-[Clear](https://desertant.com/models/clear/) from Desert Ant Labs, a fine-tuned
-DeepFilterNet 3 that runs entirely on-device. It comes in three forms:
+Onda is a suite of voice tools built on the small on-device models from
+[Desert Ant Labs](https://desertant.com). Nothing is uploaded: the models run in
+the browser or in the app, and are downloaded once from Hugging Face.
+
+| Tool | Model | What it does | Where |
+|---|---|---|---|
+| <img src="assets/logo.svg" width="20" alt=""> **Soap** | [Clear](https://desertant.com/models/clear/) | Denoise, dereverb and loudness normalization | Web, desktop app, VST3/AU/CLAP plugin |
+| <img src="assets/onda-logo.svg" width="20" alt=""> **Transcript & subtitles** | [Voz](https://desertant.com/models/voz/) | Transcript with word timestamps in 25 languages, SRT/VTT/TXT export | Web |
+
+## Soap: voice cleanup
+
+Soap is built on Clear, a fine-tuned DeepFilterNet 3. It comes in three forms:
 
 | | `plugin/` | `plugin/app/` | `web/` |
 |---|---|---|---|
@@ -25,9 +34,9 @@ Clear processes whole takes, not a real-time stream: loudness normalization
 measures the integrated LUFS of the whole take, and even its streaming mode
 works in 2-second windows. So the plugin works "offline", Melodyne style.
 
-## Audio plugin
+### Audio plugin
 
-### Download and install
+#### Download and install
 
 Every tag `vX.Y.Z` publishes a GitHub Release with the plugin and app
 packages below (every push also leaves them as Actions artifacts):
@@ -47,7 +56,7 @@ cached.
 > (the script removes the quarantine flag), but distributing to others without
 > warnings needs a Developer ID signature and notarization.
 
-### Usage
+#### Usage
 
 1. Put Soap on the voice track.
 2. Press **Capture**, then play the section you want to clean in your DAW.
@@ -62,7 +71,7 @@ Details:
 - If the project's sample rate changes, the take is re-rendered automatically from the original.
 - The audio thread never allocates or blocks. Capture goes through lock-free ring buffers, and download, inference, and disk I/O run on a worker thread.
 
-### How it's built
+#### How it's built
 
 - `plugin/src`: the plugin in Rust with [nih-plug](https://github.com/robbert-vdh/nih-plug) (CLAP export) and a custom egui GUI (`theme.rs`: palette, logo painted as vectors, bubble sliders, foam animation while cleaning). Clear is loaded at runtime through its C ABI (`dal_*`), the same one the official Node SDK uses.
 - `plugin/wrapper`: [clap-wrapper](https://github.com/free-audio/clap-wrapper) turns the CLAP into **VST3** and **AUv2**. On macOS the CLAP is embedded in the VST3 and AU bundles, and the Clear core in `Contents/Resources/native` of the CLAP.
@@ -70,7 +79,7 @@ Details:
   - macOS and Linux: prebuilt from the `@desert-ant-labs/clear` npm package (`scripts/install-native.sh`).
   - Windows: Desert Ant Labs doesn't publish it, so CI builds it from the source of [desert-ant-core](https://github.com/Desert-Ant-Labs/desert-ant-core) (`scripts/build-clear-windows.ps1`: Swift 6.2 + LiteRT). The DLLs sit next to the `.clap` and are loaded from that folder only.
 
-### Local build
+#### Local build
 
 Prerequisites: Rust stable, CMake 3.21+, and a C++ compiler (Xcode on macOS, Visual
 Studio on Windows). On Linux you also need `libx11-xcb-dev libxcursor-dev libgl-dev
@@ -90,7 +99,7 @@ cd plugin
 To try the model outside a DAW:
 `SOAP_NATIVE_DIR=<clear-core-folder> cargo run --release --example enhance_wav -- noisy.wav clean.wav`.
 
-### Tests and CI
+#### Tests and CI
 
 `.github/workflows/build.yml` runs on every push:
 
@@ -104,7 +113,7 @@ The Linux VST3 passes all 47 tests of Steinberg's `validator`, and the CLAP pass
 `clap-validator` except for the `state-reproducibility-*` tests, which nih-plug's own
 examples fail too.
 
-## Desktop app (`plugin/app`)
+### Desktop app (`plugin/app`)
 
 The same cleaning without a DAW: drop a recording on the window (WAV, AIFF,
 FLAC, MP3, M4A/AAC, ALAC, Ogg Vorbis), Soap washes it right away, then you
@@ -135,9 +144,12 @@ Build it with `cargo run --release -p soap-app` (it needs the Clear core:
 `SOAP_NATIVE_DIR`, as for `enhance_wav`), or package it with
 `./scripts/package-app-unix.sh` / `./scripts/package-app-windows.ps1`.
 
-## Web interface (`web/`)
+## Onda on the web (`web/`)
 
 **Live demo:** [soap-blond.vercel.app](https://soap-blond.vercel.app)
+
+One page runs the whole flow: load or record a file, clean it with Soap, compare,
+then transcribe the clean (or original) version and export subtitles.
 
 ```bash
 cd web
@@ -150,6 +162,8 @@ npm run build    # static site in web/dist/
 - Settings: strength, LUFS target (Podcast −19, Streaming −14, EBU R128 −23, custom, off), true-peak ceiling, max gain, mono or stereo, 48/44.1 kHz output, CPU or WebGPU
 - Before/after comparison with waveforms, click-to-seek, and A/B switching (`A`/`B` keys) that keeps the playback position
 - Export WAV as 16-bit PCM or 32-bit float
+- **Transcript** with Voz: every word is clickable and jumps the player there, and the word being spoken is highlighted during playback
+- **Subtitles**: SRT and WebVTT cues of at most two 42-character lines and 6 seconds, split at pauses and sentence ends (`src/subtitles.ts`, tested with `npm test`), plus plain text in paragraphs
 
 The weights (`desert-ant-labs/clear` on Hugging Face) are downloaded on first use
 and cached by the browser (`VITE_CLEAR_MODEL_BASE_URL` serves them yourself). The
@@ -157,14 +171,26 @@ LiteRT.js runtime is served from your own origin. For the multi-threaded runtime
 the host must send `Cross-Origin-Opener-Policy: same-origin` and
 `Cross-Origin-Embedder-Policy: credentialless` headers (the Vite servers already do).
 
+Voz runs on WebGPU (with the decode step on WebNN where the browser has it) and
+falls back to the CPU on a machine without a usable GPU. Its bundle is about
+390 MB, downloaded on the first transcription and kept in the browser's cache
+(`VITE_VOZ_MODEL_BASE_URL` serves it yourself). ONNX Runtime Web is bundled by
+Vite and loaded only when you transcribe. Voz doesn't detect the language
+itself, and its accuracy varies by language (see the
+[model card](https://huggingface.co/desert-ant-labs/voz)).
+
+CI runs the page in headless Chromium with the real models: a noisy file through
+Clear, then a synthetic spoken sentence (espeak-ng) cleaned and transcribed by Voz,
+checking the words and the SRT.
+
 ## Licenses
 
-- **Clear** (model, SDK, native core) is under the [Desert Ant Labs Source-Available License](https://license.desertant.com/1.0). It's not an OSI open-source license:
+- **Clear** and **Voz** (models, SDKs, native core) are under the [Desert Ant Labs Source-Available License](https://license.desertant.com/1.0). It's not an OSI open-source license:
   - Free up to 100,000 monthly active devices per platform, per model. Above that you need a commercial license.
   - Desert Ant Labs must be credited (the web UI and the plugin do this).
   - You may not use the model or its outputs to train competing models.
   - The SDK sends Desert Ant Labs an active-device count. It never sends the audio.
 - **nih-plug** is ISC and **clap-wrapper** is MIT. The app uses **eframe/egui**, **Symphonia**, **cpal** and **rfd** (MIT/Apache 2.0 or MPL 2.0 for Symphonia). The **VST3 SDK** (MIT since 2025) and **AudioUnitSDK** (Apache 2.0) are fetched at build time. There are no GPL components: VST3 comes from clap-wrapper, not from nih-plug's GPLv3 export.
 - The **Nunito** font (plugin and web app) is under the SIL Open Font License 1.1 (`plugin/assets/fonts/OFL.txt`).
-- The logo and icons (`assets/`, `web/public/`) are part of this project.
+- The Onda and Soap logos and icons (`assets/`, `web/public/`, `plugin/app/assets/`) are part of this project.
 - VST is a trademark of Steinberg Media Technologies GmbH.

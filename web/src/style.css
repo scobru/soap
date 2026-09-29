@@ -248,7 +248,7 @@ h2 { margin: 0 0 14px; font-size: 0.8rem; text-transform: uppercase; letter-spac
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 18px;
 }
-.compare-panel { grid-column: 1 / -1; }
+.compare-panel, .transcript-panel { grid-column: 1 / -1; }
 @media (max-width: 760px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 
 .panel {
@@ -462,3 +462,31 @@ kbd { font: 700 0.75rem ui-monospace, monospace; border: 1px solid var(--line); 
   line-height: 1.5;
   color: var(--muted);
 }
+
+/* Section titles that name the tool doing the work. */
+.tool-title { display: flex; align-items: center; gap: 8px; }
+.tool-title img { width: 30px; height: 30px; margin: -6px 0; }
+.tx-controls label { font-size: 0.92rem; }
+.tx-controls select { width: auto; }
+.tx-controls #transcribe { margin-left: auto; }
+.transcript-panel > small { display: block; margin-top: 8px; font-size: 0.8rem; }
+#tx-status { margin: 12px 0 0; }
+
+.transcript {
+  margin-top: 16px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--track);
+  line-height: 1.9;
+  font-size: 1.02rem;
+}
+.transcript p { margin: 0 0 12px; }
+.transcript p:last-child { margin-bottom: 0; }
+.transcript .w { cursor: pointer; border-radius: 6px; padding: 1px 1px; transition: background 0.12s, color 0.12s; }
+.transcript .w:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.transcript .w.now { background: var(--accent); color: var(--accent-fg); }
+.transcript .empty { color: var(--muted); }
+.tx-exports #tx-stats { margin-left: auto; }
+.secondary.link { background: var(--panel); }

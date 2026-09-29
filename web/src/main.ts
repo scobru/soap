@@ -1,7 +1,9 @@
 import "@fontsource/nunito/600.css";
 import "@fontsource/nunito/800.css";
 import type { Clear as ClearInstance, ClearResult, EnhanceOptions, LoudnessPreset } from "@desert-ant-labs/clear";
+import type { Voz as VozInstance, VozResult } from "@desert-ant-labs/voz";
 import { applyLanguage, getCurrentLanguage, onLanguageChange, setLanguage, t } from "./i18n";
+import { toCues, toSrt, toText, toVtt } from "./subtitles";
 import { encodeWav, type WavFormat } from "./wav";
 import { Waveform } from "./waveform";
 
@@ -41,6 +43,18 @@ const ui = {
   statPeak: $("stat-peak"),
   statDur: $("stat-dur"),
   statRtf: $("stat-rtf"),
+  txSource: $<HTMLSelectElement>("tx-source"),
+  transcribe: $<HTMLButtonElement>("transcribe"),
+  txProgress: $("tx-progress"),
+  txProgressBar: $("tx-progress-bar"),
+  txStatus: $("tx-status"),
+  txError: $("tx-error"),
+  transcript: $("transcript"),
+  txExports: $("tx-exports"),
+  dlSrt: $<HTMLAnchorElement>("dl-srt"),
+  dlVtt: $<HTMLAnchorElement>("dl-vtt"),
+  dlTxt: $<HTMLAnchorElement>("dl-txt"),
+  txStats: $("tx-stats"),
 };
 
 type Source = { name: string; channels: Float32Array[]; sampleRate: number };
@@ -77,6 +91,8 @@ onLanguageChange(() => {
     const seconds = source.channels[0].length / source.sampleRate;
     ui.sourceInfo.textContent = `${source.name} · ${formatTime(seconds)} · ${source.channels.length === 2 ? "stereo" : "mono"}`;
   }
+  ui.transcribe.textContent = transcribing ? t("txButtonBusy") : t("txButton");
+  if (transcript) ui.txStats.textContent = t("txDone")(transcript.words.length, transcript.realtimeFactor.toFixed(0));
 });
 
 // --- Model -----------------------------------------------------------------
@@ -153,6 +169,7 @@ async function loadSource(blob: Blob, name: string) {
     waveClean.setAudio(null);
     ui.download.hidden = true;
     ui.stats.hidden = true;
+    clearTranscript();
     setAB("orig");
     refreshButtons();
     getModel().catch(showError);
@@ -308,6 +325,8 @@ function showResult(r: ClearResult) {
   ui.statDur.textContent = formatTime(r.durationSec);
   ui.statRtf.textContent = t("realtimeFactor")(r.realtimeFactor.toFixed(1));
   ui.stats.hidden = false;
+  ui.txSource.disabled = false;
+  ui.txSource.value = "clean";
 }
 
 ui.format.addEventListener("change", () => {
@@ -448,7 +467,10 @@ function onPlayerChange() {
 }
 
 function tick() {
-  if (player.playing) onPlayerChange();
+  if (player.playing) {
+    onPlayerChange();
+    highlightWord(player.position);
+  }
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
@@ -471,10 +493,188 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "b" || e.key === "B") setAB("clean");
 });
 
+// --- Transcript and subtitles (Voz) -----------------------------------------
+
+let voz: Promise<VozInstance> | null = null;
+let transcript: VozResult | null = null;
+let transcribing = false;
+let wordSpans: HTMLSpanElement[] = [];
+let currentWord = -1;
+const exportUrls: string[] = [];
+
+function getVoz(): Promise<VozInstance> {
+  voz ??= (async () => {
+    ui.txStatus.textContent = t("txLoading");
+    const { Voz } = await import("@desert-ant-labs/voz");
+    return Voz.load({
+      modelBaseUrl: import.meta.env.VITE_VOZ_MODEL_BASE_URL || undefined,
+      onProgress: (fraction) => {
+        ui.txStatus.textContent = t("txDownloading")(Math.round(fraction * 100));
+        setTxProgress(fraction);
+      },
+    });
+  })();
+  voz.catch(() => (voz = null));
+  return voz;
+}
+
+ui.transcribe.addEventListener("click", async () => {
+  if (!source || transcribing) return;
+  transcribing = true;
+  ui.transcribe.textContent = t("txButtonBusy");
+  refreshButtons();
+  showTxError(null);
+  ui.txStatus.hidden = false;
+  setTxProgress(null);
+  try {
+    // Transcribe the version the user picked; both share the same timeline.
+    const useClean = ui.txSource.value === "clean" && result;
+    const channels = useClean ? result!.channels : source.channels;
+    const sampleRate = useClean ? result!.sampleRate : source.sampleRate;
+    const model = await getVoz();
+    setTxProgress(0);
+    const done = await model.transcribe(
+      { samples: channels.length > 1 ? downmix(channels) : channels[0], sampleRate },
+      {
+        onProgress: (fraction) => {
+          ui.txStatus.textContent = t("txRunning")(Math.round(fraction * 100));
+          setTxProgress(fraction);
+        },
+      },
+    );
+    showTranscript(done);
+    ui.txStatus.hidden = true;
+  } catch (err) {
+    ui.txStatus.hidden = true;
+    const offline = /download failed|Failed to fetch|NetworkError/i.test(String(err));
+    showTxError(offline ? new Error(t("errorHuggingFace"), { cause: err }) : err);
+  } finally {
+    transcribing = false;
+    ui.transcribe.textContent = t("txButton");
+    ui.txProgress.hidden = true;
+    refreshButtons();
+  }
+});
+
+function showTranscript(r: VozResult) {
+  transcript = r;
+  ui.transcript.replaceChildren();
+  wordSpans = [];
+  currentWord = -1;
+  if (!r.words.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = t("txEmpty");
+    ui.transcript.append(empty);
+  }
+  // Paragraphs at long pauses, one clickable span per word.
+  let paragraph: HTMLParagraphElement | null = null;
+  r.words.forEach((word, i) => {
+    if (!paragraph || word.start - r.words[i - 1].end >= 1.5) {
+      paragraph = document.createElement("p");
+      ui.transcript.append(paragraph);
+    } else if (!/^[,.;:!?%)\]}»”’…]/.test(word.text.trim())) {
+      paragraph.append(" ");
+    }
+    const span = document.createElement("span");
+    span.className = "w";
+    span.textContent = word.text.trim();
+    span.dataset.i = String(i);
+    paragraph.append(span);
+    wordSpans.push(span);
+  });
+  ui.transcript.hidden = false;
+
+  const base = (source?.name ?? "onda").replace(/\.[^.]+$/, "");
+  const cues = toCues(r.words);
+  setExport(ui.dlSrt, toSrt(cues), `${base}.srt`, "application/x-subrip");
+  setExport(ui.dlVtt, toVtt(cues), `${base}.vtt`, "text/vtt");
+  setExport(ui.dlTxt, toText(r.words), `${base}.txt`, "text/plain");
+  ui.txStats.textContent = t("txDone")(r.words.length, r.realtimeFactor.toFixed(0));
+  ui.txExports.hidden = !r.words.length;
+}
+
+function setExport(link: HTMLAnchorElement, text: string, name: string, type: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
+  exportUrls.push(url);
+  link.href = url;
+  link.download = name;
+}
+
+function clearTranscript() {
+  transcript = null;
+  wordSpans = [];
+  currentWord = -1;
+  exportUrls.splice(0).forEach((url) => URL.revokeObjectURL(url));
+  ui.transcript.replaceChildren();
+  ui.transcript.hidden = true;
+  ui.txExports.hidden = true;
+  showTxError(null);
+}
+
+ui.transcript.addEventListener("click", (e) => {
+  const span = (e.target as HTMLElement).closest<HTMLSpanElement>(".w");
+  if (!span || !transcript || !player.duration) return;
+  const word = transcript.words[Number(span.dataset.i)];
+  player.seek(Math.min(1, word.start / player.duration));
+  if (!player.playing) player.play();
+  onPlayerChange();
+  highlightWord(word.start);
+});
+
+/** Mark the word being spoken at `time`, found by binary search. */
+function highlightWord(time: number) {
+  if (!transcript || !wordSpans.length) return;
+  const words = transcript.words;
+  let lo = 0;
+  let hi = words.length - 1;
+  let found = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (words[mid].start <= time) {
+      found = mid;
+      lo = mid + 1;
+    } else hi = mid - 1;
+  }
+  if (found !== -1 && time > words[found].end + 0.5) found = -1;
+  if (found === currentWord) return;
+  wordSpans[currentWord]?.classList.remove("now");
+  currentWord = found;
+  const span = wordSpans[found];
+  if (!span) return;
+  span.classList.add("now");
+  // Keep the spoken word in view inside the transcript box, not the page.
+  const box = ui.transcript;
+  const top = span.offsetTop - box.offsetTop;
+  if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 40) {
+    box.scrollTo({ top: top - box.clientHeight / 3, behavior: "smooth" });
+  }
+}
+
+function setTxProgress(fraction: number | null) {
+  ui.txProgress.hidden = false;
+  ui.txProgress.classList.toggle("indeterminate", fraction === null);
+  ui.txProgressBar.style.width = fraction === null ? "" : `${Math.round(fraction * 100)}%`;
+}
+
+function showTxError(err: unknown) {
+  if (err == null) {
+    ui.txError.hidden = true;
+    return;
+  }
+  console.error(err);
+  const message = err instanceof Error ? err.message : String(err);
+  ui.txError.textContent = `${t("txError")} ${message.split("\n")[0]}`;
+  ui.txError.hidden = false;
+}
+
 // --- Helpers ---------------------------------------------------------------
 
 function refreshButtons() {
   ui.process.disabled = !source || busy;
+  ui.transcribe.disabled = !source || transcribing;
+  ui.txSource.disabled = !result;
+  if (!result) ui.txSource.value = "orig";
   ui.play.disabled = !source;
   ui.record.disabled = busy;
 }

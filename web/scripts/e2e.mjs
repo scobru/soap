@@ -1,11 +1,12 @@
-// End-to-end check against the real Clear model: serve the production build,
-// load a noisy file, clean it, and confirm the result and export appear.
-// Usage: node scripts/e2e.mjs <noisy.wav>   (after `npm run build`)
+// End-to-end check against the real models: serve the production build, load
+// a noisy file, clean it with Clear and confirm the result and export appear;
+// then, given a spoken file, clean it and transcribe it with Voz.
+// Usage: node scripts/e2e.mjs <noisy.wav> [speech.wav]   (after `npm run build`)
 import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 
-const input = process.argv[2];
-if (!input) throw new Error("usage: node scripts/e2e.mjs <noisy.wav>");
+const [input, speech] = process.argv.slice(2);
+if (!input) throw new Error("usage: node scripts/e2e.mjs <noisy.wav> [speech.wav]");
 
 const server = spawn("npx", ["vite", "preview", "--port", "4173", "--strictPort"], { stdio: "inherit" });
 const browser = await chromium.launch();
@@ -40,6 +41,30 @@ try {
   const speed = await page.textContent("#stat-rtf");
   console.log(`cleaned: input ${lufs}, ${speed}`);
   if (!/LUFS/.test(lufs)) throw new Error("no loudness measurement in the result");
+
+  if (speech) {
+    await page.setInputFiles("#file", speech);
+    await page.waitForFunction(() => !document.getElementById("process").disabled, null, { timeout: 60_000 });
+    await page.click("#process");
+    await page.waitForSelector("#download:not([hidden])", { timeout: 180_000 });
+    if ((await page.inputValue("#tx-source")) !== "clean") throw new Error("the clean version is not offered for transcription");
+    await page.click("#transcribe");
+    // Voz downloads ~390 MB the first time and runs on the CPU without a GPU.
+    await page.waitForFunction(
+      () => !document.getElementById("transcript").hidden || !document.getElementById("tx-error").hidden,
+      null,
+      { timeout: 600_000 },
+    );
+    const error = await page.textContent("#tx-error");
+    if (await page.isVisible("#tx-error")) throw new Error(`transcription failed: ${error}`);
+    const text = (await page.textContent("#transcript")).trim();
+    const words = await page.locator("#transcript .w").count();
+    console.log(`transcribed ${words} words: ${text}`);
+    if (!/hello|world|test|transcri/i.test(text)) throw new Error("the transcript does not match the speech");
+    const srt = await page.evaluate(async () => (await fetch(document.getElementById("dl-srt").href)).text());
+    if (!/^1\n\d\d:\d\d:\d\d,\d{3} --> /.test(srt)) throw new Error(`bad SRT: ${srt.slice(0, 80)}`);
+    console.log(`SRT:\n${srt.split("\n\n")[0]}`);
+  }
 } finally {
   await browser.close();
   server.kill();

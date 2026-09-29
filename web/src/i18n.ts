@@ -61,13 +61,29 @@ export interface Translations {
   footRepo: string;
   footPlugin: string;
   footCredits: string;
+  sectionTranscript: string;
+  txSourceLabel: string;
+  txSourceClean: string;
+  txSourceOrig: string;
+  txButton: string;
+  txButtonBusy: string;
+  txHelp: string;
+  txLoading: string;
+  txDownloading: (pct: number) => string;
+  txRunning: (pct: number) => string;
+  txDone: (words: number, rtf: string) => string;
+  txEmpty: string;
+  txError: string;
+  dlSrt: string;
+  dlVtt: string;
+  dlTxt: string;
 }
 
 export const dict: Record<Language, Translations> = {
   it: {
-    pageTitle: "Soap: pulizia della voce",
-    pageDescription: "Pulizia delle voci nel browser con il modello Clear: denoise, dereverb e normalizzazione loudness, tutto in locale.",
-    brandSubtitle: "Denoise, dereverb e loudness per registrazioni vocali. L'audio non lascia mai il tuo dispositivo.",
+    pageTitle: "Onda: voce, testo e sottotitoli",
+    pageDescription: "Onda: pulisci, trascrivi e sottotitola la voce nel browser con i modelli Clear e Voz, tutto in locale.",
+    brandSubtitle: "Pulisci, trascrivi e sottotitola la voce. L'audio non lascia mai il tuo dispositivo.",
     modelStatusIdle: "Modello non caricato",
     modelStatusLoadingRuntime: "Caricamento runtime…",
     modelStatusDownloadingModel: "Download modello…",
@@ -84,7 +100,7 @@ export const dict: Record<Language, Translations> = {
     micError: "Accesso al microfono negato o non disponibile.",
     decoding: "Decodifica in corso…",
     decodeError: "Impossibile decodificare questo file. Prova con WAV, MP3 o M4A.",
-    sectionSettings: "2 · Impostazioni",
+    sectionSettings: "2 · Pulisci con Soap",
     labelStrength: "Intensità",
     helpStrength: "Miscela tra originale e voce pulita. Abbassala se il risultato suona troppo processato.",
     labelLoudness: "Loudness di destinazione",
@@ -121,15 +137,31 @@ export const dict: Record<Language, Translations> = {
     statSpeed: "Velocità",
     realtimeFactor: (rtf: string) => `${rtf}× tempo reale`,
     keyboardHint: "<kbd>Spazio</kbd> play/pausa, <kbd>A</kbd>/<kbd>B</kbd> per passare tra originale e pulito senza perdere la posizione.",
-    footDev: "<strong>Soap</strong> · Sviluppato da <a href=\"https://scobrudot.dev\" target=\"_blank\" rel=\"noopener\"><strong>scobru</strong> (Francesco Bruno)</a>",
+    footDev: "<strong>Onda</strong> · Sviluppato da <a href=\"https://scobrudot.dev\" target=\"_blank\" rel=\"noopener\"><strong>scobru</strong> (Francesco Bruno)</a>",
     footRepo: "Repository GitHub",
     footPlugin: "Plugin VST3 / CLAP / AU",
-    footCredits: "Voice enhancement powered by <a href=\"https://desertant.com/models/clear/\" target=\"_blank\" rel=\"noopener\">Clear</a> from Desert Ant Labs (fine-tuned DeepFilterNet 3), under the <a href=\"https://license.desertant.com/1.0\" target=\"_blank\" rel=\"noopener\">Desert Ant Labs Source-Available License</a>. I pesi vengono scaricati da Hugging Face al primo uso e poi restano in cache locale; l'audio non lascia mai il tuo dispositivo.",
+    footCredits: "Miglioramento della voce con <a href=\"https://desertant.com/models/clear/\" target=\"_blank\" rel=\"noopener\">Clear</a> e riconoscimento vocale con <a href=\"https://desertant.com/models/voz/\" target=\"_blank\" rel=\"noopener\">Voz</a> di Desert Ant Labs, sotto la <a href=\"https://license.desertant.com/1.0\" target=\"_blank\" rel=\"noopener\">Desert Ant Labs Source-Available License</a>. I modelli vengono scaricati da Hugging Face al primo uso e poi restano in cache locale; l'audio non lascia mai il tuo dispositivo.",
+    sectionTranscript: "4 · Trascrizione e sottotitoli",
+    txSourceLabel: "Audio da trascrivere",
+    txSourceClean: "Versione pulita",
+    txSourceOrig: "Originale",
+    txButton: "Trascrivi",
+    txButtonBusy: "Trascrivo…",
+    txHelp: "Voz riconosce 25 lingue, tra cui italiano e inglese. Al primo uso scarica il modello (circa 390 MB), poi resta in cache.",
+    txLoading: "Carico Voz…",
+    txDownloading: (pct: number) => `Scarico Voz… ${pct}%`,
+    txRunning: (pct: number) => `Trascrivo… ${pct}%`,
+    txDone: (words: number, rtf: string) => `${words} parole · ${rtf}× tempo reale`,
+    txEmpty: "Nessuna parola riconosciuta.",
+    txError: "La trascrizione non è riuscita.",
+    dlSrt: "Sottotitoli SRT",
+    dlVtt: "WebVTT",
+    dlTxt: "Testo",
   },
   en: {
-    pageTitle: "Soap: voice cleanup",
-    pageDescription: "In-browser voice cleanup powered by the Clear model: denoise, dereverb, and loudness normalization, fully on-device.",
-    brandSubtitle: "Denoise, dereverb and loudness for vocal recordings. Audio never leaves your device.",
+    pageTitle: "Onda: voice, text and subtitles",
+    pageDescription: "Onda: clean up, transcribe and subtitle voice recordings in the browser with the Clear and Voz models, fully on-device.",
+    brandSubtitle: "Clean up, transcribe and subtitle your voice. Audio never leaves your device.",
     modelStatusIdle: "Model not loaded",
     modelStatusLoadingRuntime: "Loading runtime…",
     modelStatusDownloadingModel: "Downloading model…",
@@ -146,7 +178,7 @@ export const dict: Record<Language, Translations> = {
     micError: "Microphone access denied or unavailable.",
     decoding: "Decoding audio…",
     decodeError: "Could not decode this file. Try WAV, MP3, or M4A.",
-    sectionSettings: "2 · Settings",
+    sectionSettings: "2 · Clean up with Soap",
     labelStrength: "Intensity",
     helpStrength: "Blend between original and clean voice. Lower it if the output sounds over-processed.",
     labelLoudness: "Target loudness",
@@ -183,10 +215,26 @@ export const dict: Record<Language, Translations> = {
     statSpeed: "Speed",
     realtimeFactor: (rtf: string) => `${rtf}× realtime`,
     keyboardHint: "<kbd>Space</kbd> play/pause, <kbd>A</kbd>/<kbd>B</kbd> to toggle between original and clean without losing position.",
-    footDev: "<strong>Soap</strong> · Developed by <a href=\"https://scobrudot.dev\" target=\"_blank\" rel=\"noopener\"><strong>scobru</strong> (Francesco Bruno)</a>",
+    footDev: "<strong>Onda</strong> · Developed by <a href=\"https://scobrudot.dev\" target=\"_blank\" rel=\"noopener\"><strong>scobru</strong> (Francesco Bruno)</a>",
     footRepo: "GitHub Repository",
     footPlugin: "VST3 / CLAP / AU Plugin",
-    footCredits: "Voice enhancement powered by <a href=\"https://desertant.com/models/clear/\" target=\"_blank\" rel=\"noopener\">Clear</a> from Desert Ant Labs (fine-tuned DeepFilterNet 3), under the <a href=\"https://license.desertant.com/1.0\" target=\"_blank\" rel=\"noopener\">Desert Ant Labs Source-Available License</a>. Model weights are downloaded from Hugging Face on first use and cached locally; audio never leaves your device.",
+    footCredits: "Voice enhancement by <a href=\"https://desertant.com/models/clear/\" target=\"_blank\" rel=\"noopener\">Clear</a> and speech recognition by <a href=\"https://desertant.com/models/voz/\" target=\"_blank\" rel=\"noopener\">Voz</a> from Desert Ant Labs, under the <a href=\"https://license.desertant.com/1.0\" target=\"_blank\" rel=\"noopener\">Desert Ant Labs Source-Available License</a>. Models are downloaded from Hugging Face on first use and cached locally; audio never leaves your device.",
+    sectionTranscript: "4 · Transcript and subtitles",
+    txSourceLabel: "Audio to transcribe",
+    txSourceClean: "Clean version",
+    txSourceOrig: "Original",
+    txButton: "Transcribe",
+    txButtonBusy: "Transcribing…",
+    txHelp: "Voz recognizes 25 languages, English and Italian among them. The first time it downloads the model (about 390 MB), then keeps it cached.",
+    txLoading: "Loading Voz…",
+    txDownloading: (pct: number) => `Downloading Voz… ${pct}%`,
+    txRunning: (pct: number) => `Transcribing… ${pct}%`,
+    txDone: (words: number, rtf: string) => `${words} words · ${rtf}× realtime`,
+    txEmpty: "No words recognized.",
+    txError: "Transcription failed.",
+    dlSrt: "SRT subtitles",
+    dlVtt: "WebVTT",
+    dlTxt: "Text",
   },
 };
 

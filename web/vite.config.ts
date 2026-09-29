@@ -10,9 +10,9 @@ const isolation = {
 export default defineConfig({
   base: "./",
   build: { target: "es2022" },
-  // Pre-bundling would break the SDK's `new URL("ClearWeb.wasm", import.meta.url)`.
+  // Pre-bundling would break the SDKs' `new URL("ClearWeb.wasm", import.meta.url)`.
   optimizeDeps: {
-    exclude: ["@desert-ant-labs/clear", "@desert-ant-labs/core", "@litertjs/core"],
+    exclude: ["@desert-ant-labs/clear", "@desert-ant-labs/voz", "@desert-ant-labs/core", "@litertjs/core", "onnxruntime-web"],
   },
   server: { headers: isolation },
   preview: { headers: isolation },

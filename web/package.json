@@ -1,21 +1,24 @@
 {
-  "name": "soap-web",
+  "name": "onda-web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Browser UI for cleaning up voice recordings with the Desert Ant Labs Clear model, fully on-device.",
+  "description": "Onda in the browser: clean voice recordings with Clear (Soap) and transcribe them with word timestamps and subtitles with Voz, fully on-device.",
   "scripts": {
     "copy-litert": "node scripts/copy-litert.mjs",
     "predev": "npm run copy-litert",
     "prebuild": "npm run copy-litert",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test --experimental-strip-types scripts/subtitles.test.mjs"
   },
   "dependencies": {
     "@desert-ant-labs/clear": "^3.5.0",
+    "@desert-ant-labs/voz": "^3.5.0",
     "@fontsource/nunito": "^5.3.0",
-    "@litertjs/core": "^2.5.3"
+    "@litertjs/core": "^2.5.3",
+    "onnxruntime-web": "^1.30.0"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
