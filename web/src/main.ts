@@ -2,6 +2,7 @@ import "@fontsource/nunito/600.css";
 import "@fontsource/nunito/800.css";
 import type { Clear as ClearInstance, ClearResult, EnhanceOptions, LoudnessPreset } from "@desert-ant-labs/clear";
 import { applyLanguage, getCurrentLanguage, onLanguageChange, setLanguage, t } from "./i18n";
+import { initThemeToggle } from "./theme";
 import { encodeWav, type WavFormat } from "./wav";
 import { Waveform } from "./waveform";
 
@@ -427,6 +428,10 @@ const seek = (f: number) => {
 };
 const waveOrig = new Waveform($("wave-orig"), accent("--orig"), seek);
 const waveClean = new Waveform($("wave-clean"), accent("--clean"), seek);
+initThemeToggle($<HTMLButtonElement>("theme-toggle"), () => {
+  waveOrig.draw();
+  waveClean.draw();
+});
 
 function setAB(side: "orig" | "clean") {
   if (side === "clean" && !player.hasClean()) side = "orig";

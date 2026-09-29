@@ -25,7 +25,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0f2429;
     --bg-2: #0b1c21;
     --panel: rgb(22 50 58 / 0.82);
@@ -45,6 +45,27 @@
     --shadow: 0 6px 24px rgb(0 0 0 / 0.3);
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f2429;
+  --bg-2: #0b1c21;
+  --panel: rgb(22 50 58 / 0.82);
+  --fg: #e3f4f4;
+  --muted: #8fb3ba;
+  --line: #24464f;
+  --track: #1d3d45;
+  --accent: #6fd3d6;
+  --accent-2: #7fdcc4;
+  --accent-fg: #0b1e22;
+  --coral: #ff8f96;
+  --orig: #f0b46a;
+  --clean: #6fd3d6;
+  --wave-dim: #4b7a83;
+  --wave-axis: #24464f;
+  --danger: #ff8f96;
+  --shadow: 0 6px 24px rgb(0 0 0 / 0.3);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -462,3 +483,7 @@ kbd { font: 700 0.75rem ui-monospace, monospace; border: 1px solid var(--line); 
   line-height: 1.5;
   color: var(--muted);
 }
+
+.theme-btn { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); color: var(--fg); cursor: pointer; transition: transform 0.1s, border-color 0.15s, color 0.15s; }
+.theme-btn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.theme-btn:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
